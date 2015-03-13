@@ -39,6 +39,7 @@
 #include "mytype.h"
 #include "parallel.h"
 #include "yamlOutput.h"
+#include "read_netstats.h"
 
 static uint64_t getTime(void);
 static double getTick(void);
@@ -68,6 +69,11 @@ typedef struct TimersSt
    uint64_t total;     //!< current total time
    uint64_t count;     //!< current call count
    uint64_t elapsed;   //!< lap time
+   struct net_event **device_list; //!< net_device list
+   uint64_t net_tx_bytes_start[10]; //!< network bytes tx'd
+   uint64_t net_rx_bytes_start[10]; //!< network bytes rx'd
+   uint64_t net_tx_bytes[10]; //!< network bytes tx'd
+   uint64_t net_rx_bytes[10]; //!< network bytes rx'd
  
    int minRank;        //!< rank with min value
    int maxRank;        //!< rank with max value
@@ -76,6 +82,7 @@ typedef struct TimersSt
    double maxValue;    //!< max over ranks
    double average;     //!< average over ranks
    double stdev;       //!< stdev across ranks
+   
 } Timers;
 
 /// Global timing data collected.
@@ -88,18 +95,44 @@ typedef struct TimerGlobalSt
 
 static Timers perfTimer[numberOfTimers];
 static TimerGlobal perfGlobal;
+static struct net_event **device_list = NULL;
+extern int num_devices;
 
 void profileStart(const enum TimerHandle handle)
 {
+   int ii, retval;
    perfTimer[handle].start = getTime();
+   if (!netstats_init_complete || !device_list) {
+      init(&device_list);
+   }
+   retval = read_stats(&device_list);
+   if (!device_list || retval) {
+      fprintf(screenOut, "Unable to init network counters\n");
+   } else {
+      for (ii = 0; ii < num_devices; ++ii) {
+         perfTimer[handle].net_tx_bytes_start[ii] = device_list[ii]->tx_bytes;
+         perfTimer[handle].net_rx_bytes_start[ii] = device_list[ii]->rx_bytes;
+      }
+   }      
 }
 
 void profileStop(const enum TimerHandle handle)
 {
+   int ii, retval;
    perfTimer[handle].count += 1;
    uint64_t delta = getTime() - perfTimer[handle].start;
    perfTimer[handle].total += delta;
    perfTimer[handle].elapsed += delta;
+   
+   retval = read_stats(&device_list);
+   if (retval) {
+     fprintf(screenOut, "Unable to read netstats\n");
+   } else {
+     for (ii = 0; ii < num_devices; ++ii) {
+        perfTimer[handle].net_tx_bytes[ii] = device_list[ii]->tx_bytes - perfTimer[handle].net_tx_bytes_start[ii];
+        perfTimer[handle].net_tx_bytes[ii] = device_list[ii]->tx_bytes - perfTimer[handle].net_tx_bytes_start[ii];
+     }
+   }
 }
 
 /// \details
@@ -163,6 +196,25 @@ void printPerformanceResults(int nGlobalAtoms, int printRate)
    perfGlobal.atomAllRate = perfTimer[timestepTimer].average * tick * 1e6 /
       (nGlobalAtoms * perfTimer[timestepTimer].count * printRate);
    perfGlobal.atomsPerUSec = 1.0 / perfGlobal.atomAllRate;
+   
+   fprintf(screenOut, "\nNetwork Results:\n");
+   fprintf(screenOut, "Performance Results For Rank %d:\n", getMyRank());
+   for (int ii = 0; ii < numberOfTimers; ii++) {
+      if (perfTimer[ii].count > 0)
+      {
+         double totalTime = perfTimer[ii].total*tick;
+         fprintf(screenOut, "  Timer: %s\n", timerName[ii]);
+         for (int jj = 0; jj < num_devices; ++jj) {
+           fprintf(screenOut, "    NetDevice: %d\n", jj);//perfTimer[ii].device_list[jj]->device_name);
+           fprintf(screenOut, "      RXCount: %llu bytes\n", perfTimer[ii].net_rx_bytes[jj]);
+           fprintf(screenOut, "      TXCount: %llu bytes\n", perfTimer[ii].net_tx_bytes[jj]);
+           double rate = ((double)perfTimer[ii].net_rx_bytes[jj]) / totalTime;
+           fprintf(screenOut, "      AverageRXRate: %d bytes/second\n", rate);
+           rate = ((double)perfTimer[ii].net_tx_bytes[jj]) / totalTime;
+           fprintf(screenOut, "      AverageTXRate: %d bytes/second\n", rate);
+         }
+      }
+   }
 
    fprintf(screenOut, "\n---------------------------------------------------\n");
    fprintf(screenOut, " Average atom update rate:     %6.2f us/atom/task\n", perfGlobal.atomRate);
@@ -227,7 +279,27 @@ void printPerformanceResultsYaml(FILE* file)
    fprintf(file, "  AtomRate:\n");
    fprintf(file, "    AverageRate: %6.2f\n", perfGlobal.atomsPerUSec);
    fprintf(file, "    Units: atoms/us\n");
- 
+   
+   fprintf(file, "Network Results:\n");
+   fprintf(file, "  TotalRanks: %d\n", getNRanks());
+   fprintf(file, "  ReportingTransferUnits: bytes\n");
+   fprintf(file, "Performance Results For Rank %d:\n", getMyRank());
+   for (int ii = 0; ii < numberOfTimers; ii++) {
+      if (perfTimer[ii].count > 0)
+      {
+         double totalTime = perfTimer[ii].total*tick;
+         fprintf(file, "  Timer: %s\n", timerName[ii]);
+         for (int jj = 0; jj < num_devices; ++jj) {
+           fprintf(file, "    NetDevice: %d\n", jj);//perfTimer[ii].device_list[jj]->device_name);
+           fprintf(file, "      RXCount: %llu\n", perfTimer[ii].net_rx_bytes[jj]);
+           fprintf(file, "      TXCount: %llu\n", perfTimer[ii].net_tx_bytes[jj]);
+           double rate = ((double)perfTimer[ii].net_rx_bytes[jj]) / totalTime;
+           fprintf(file, "      AverageRXRate: %d\n", rate);
+           rate = ((double)perfTimer[ii].net_tx_bytes[jj]) / totalTime;
+           fprintf(file, "      AverageTXRate: %d\n", rate);
+        }
+      }
+   }
    fprintf(file, "\n");
 }
 
