@@ -206,12 +206,13 @@ void printPerformanceResults(int nGlobalAtoms, int printRate)
          fprintf(screenOut, "  Timer: %s\n", timerName[ii]);
          for (int jj = 0; jj < num_devices; ++jj) {
            fprintf(screenOut, "    NetDevice: %d\n", jj);//perfTimer[ii].device_list[jj]->device_name);
+           fprintf(screenOut, "      TotalTime: %f\n", totalTime);
            fprintf(screenOut, "      RXCount: %llu bytes\n", perfTimer[ii].net_rx_bytes[jj]);
            fprintf(screenOut, "      TXCount: %llu bytes\n", perfTimer[ii].net_tx_bytes[jj]);
            double rate = ((double)perfTimer[ii].net_rx_bytes[jj]) / totalTime;
-           fprintf(screenOut, "      AverageRXRate: %d bytes/second\n", rate);
+           fprintf(screenOut, "      AverageRXRate: %f bytes/second\n", rate);
            rate = ((double)perfTimer[ii].net_tx_bytes[jj]) / totalTime;
-           fprintf(screenOut, "      AverageTXRate: %d bytes/second\n", rate);
+           fprintf(screenOut, "      AverageTXRate: %f bytes/second\n", rate);
          }
       }
    }
@@ -294,9 +295,9 @@ void printPerformanceResultsYaml(FILE* file)
            fprintf(file, "      RXCount: %llu\n", perfTimer[ii].net_rx_bytes[jj]);
            fprintf(file, "      TXCount: %llu\n", perfTimer[ii].net_tx_bytes[jj]);
            double rate = ((double)perfTimer[ii].net_rx_bytes[jj]) / totalTime;
-           fprintf(file, "      AverageRXRate: %d\n", rate);
+           fprintf(file, "      AverageRXRate: %f\n", rate);
            rate = ((double)perfTimer[ii].net_tx_bytes[jj]) / totalTime;
-           fprintf(file, "      AverageTXRate: %d\n", rate);
+           fprintf(file, "      AverageTXRate: %f\n", rate);
         }
       }
    }
