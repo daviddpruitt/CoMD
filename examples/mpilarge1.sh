@@ -11,6 +11,6 @@
 # specify your email address
 #PBS -M ddpruitt@miners.utep.edu
 
-# Simple strong scaling study with eam potential and 256,000 atoms
-mpirun -np 1  ../bin/CoMD-mpi -e -i 1 -j 1 -k 1 -x 40 -y 40 -z 40
+# Simple strong scaling study with eam potential and 256,000  * 4 atoms
+mpirun -np 1  ../bin/CoMD-mpi -N 400 -n 40 -e -i 1 -j 1 -k 1 -x 80 -y 80 -z 40
 

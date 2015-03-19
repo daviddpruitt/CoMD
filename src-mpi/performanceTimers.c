@@ -44,6 +44,8 @@
 static uint64_t getTime(void);
 static double getTick(void);
 static void timerStats(void);
+// aggregate netstats
+static void aggregateNetStats(void);
 
 /// You must add timer name in same order as enum in .h file.
 /// Leading spaces can be specified to show a hierarchy of timers.
@@ -70,6 +72,10 @@ typedef struct TimersSt
    uint64_t count;     //!< current call count
    uint64_t elapsed;   //!< lap time
    struct net_event **device_list; //!< net_device list
+   uint64_t net_tx_total;     //!< total tx'd
+   uint64_t net_rx_total;     //!< total rx'd
+   uint64_t net_total;        //!< total bytes
+   uint64_t net_total_ranks;  //!< total across ranks
    uint64_t net_tx_bytes_start[10]; //!< network bytes tx'd
    uint64_t net_rx_bytes_start[10]; //!< network bytes rx'd
    uint64_t net_tx_bytes[10]; //!< network bytes tx'd
@@ -152,6 +158,8 @@ double getElapsedTime(const enum TimerHandle handle)
 /// information over all ranks.
 void printPerformanceResults(int nGlobalAtoms, int printRate)
 {
+   // Aggregate net stats
+   aggregateNetStats();
    // Collect timer statistics overall and across ranks
    timerStats();
 
@@ -204,17 +212,26 @@ void printPerformanceResults(int nGlobalAtoms, int printRate)
       {
          double totalTime = perfTimer[ii].total*tick;
          fprintf(screenOut, "  Timer: %s\n", timerName[ii]);
-         for (int jj = 0; jj < num_devices; ++jj) {
-           fprintf(screenOut, "    NetDevice: %d\n", jj);//perfTimer[ii].device_list[jj]->device_name);
-           fprintf(screenOut, "      TotalTime: %f\n", totalTime);
-           fprintf(screenOut, "      RXCount: %llu bytes\n", perfTimer[ii].net_rx_bytes[jj]);
-           fprintf(screenOut, "      TXCount: %llu bytes\n", perfTimer[ii].net_tx_bytes[jj]);
-           double rate = ((double)perfTimer[ii].net_rx_bytes[jj]) / totalTime;
-           fprintf(screenOut, "      AverageRXRate: %f bytes/second\n", rate);
-           rate = ((double)perfTimer[ii].net_tx_bytes[jj]) / totalTime;
-           fprintf(screenOut, "      AverageTXRate: %f bytes/second\n", rate);
-         }
+/*         for (int jj = 0; jj < num_devices; ++jj) {*/
+/*           fprintf(screenOut, "    NetDevice: %d\n", jj);//perfTimer[ii].device_list[jj]->device_name);*/
+/*           fprintf(screenOut, "      TotalTime: %f\n", totalTime);*/
+/*           fprintf(screenOut, "      RXCount: %llu bytes\n", perfTimer[ii].net_rx_bytes[jj]);*/
+/*           fprintf(screenOut, "      TXCount: %llu bytes\n", perfTimer[ii].net_tx_bytes[jj]);*/
+/*           double rate = ((double)perfTimer[ii].net_rx_bytes[jj]) / totalTime;*/
+/*           fprintf(screenOut, "      AverageRXRate: %f bytes/second\n", rate);*/
+/*           rate = ((double)perfTimer[ii].net_tx_bytes[jj]) / totalTime;*/
+/*           fprintf(screenOut, "      AverageTXRate: %f bytes/second\n", rate);*/
+/*         }*/
+        fprintf(screenOut, "    NetDevice All\n");
+        fprintf(screenOut, "      RXCount: %llu\n", perfTimer[ii].net_rx_total);
+        fprintf(screenOut, "      TXCount: %llu\n", perfTimer[ii].net_rx_total);
+        fprintf(screenOut, "      TransferCount: %llu\n", perfTimer[ii].net_total);
+        fprintf(screenOut, "      AverageRate: %f\n", ((double)perfTimer[ii].net_total) / totalTime);
       }
+      fprintf(screenOut, "    NetDevice All Ranks\n");
+      fprintf(screenOut, "      TransferCount: %llu\n", perfTimer[ii].net_total_ranks);
+      fprintf(screenOut, "      AverageRate: %f\n",
+            ((double) perfTimer[ii].net_total_ranks) / (perfTimer[ii].average * (double)getNRanks()));
    }
 
    fprintf(screenOut, "\n---------------------------------------------------\n");
@@ -232,6 +249,9 @@ void printPerformanceResults(int nGlobalAtoms, int printRate)
 
 void printPerformanceResultsYaml(FILE* file)
 {
+   // Aggregate net stats
+   aggregateNetStats();
+   
    if (! printRank())
       return;
 
@@ -290,16 +310,25 @@ void printPerformanceResultsYaml(FILE* file)
       {
          double totalTime = perfTimer[ii].total*tick;
          fprintf(file, "  Timer: %s\n", timerName[ii]);
-         for (int jj = 0; jj < num_devices; ++jj) {
-           fprintf(file, "    NetDevice: %d\n", jj);//perfTimer[ii].device_list[jj]->device_name);
-           fprintf(file, "      RXCount: %llu\n", perfTimer[ii].net_rx_bytes[jj]);
-           fprintf(file, "      TXCount: %llu\n", perfTimer[ii].net_tx_bytes[jj]);
-           double rate = ((double)perfTimer[ii].net_rx_bytes[jj]) / totalTime;
-           fprintf(file, "      AverageRXRate: %f\n", rate);
-           rate = ((double)perfTimer[ii].net_tx_bytes[jj]) / totalTime;
-           fprintf(file, "      AverageTXRate: %f\n", rate);
-        }
+/*         for (int jj = 0; jj < num_devices; ++jj) {*/
+/*           fprintf(file, "    NetDevice: %d\n", jj);//perfTimer[ii].device_list[jj]->device_name);*/
+/*           fprintf(file, "      RXCount: %llu\n", perfTimer[ii].net_rx_bytes[jj]);*/
+/*           fprintf(file, "      TXCount: %llu\n", perfTimer[ii].net_tx_bytes[jj]);*/
+/*           double rate = ((double)perfTimer[ii].net_rx_bytes[jj]) / totalTime;*/
+/*           fprintf(file, "      AverageRXRate: %f\n", rate);*/
+/*           rate = ((double)perfTimer[ii].net_tx_bytes[jj]) / totalTime;*/
+/*           fprintf(file, "      AverageTXRate: %f\n", rate);*/
+/*        }*/
+        fprintf(file, "    NetDevice All\n");
+        fprintf(file, "      RXCount: %llu\n", perfTimer[ii].net_rx_total);
+        fprintf(file, "      TXCount: %llu\n", perfTimer[ii].net_rx_total);
+        fprintf(file, "      TransferCount: %llu\n", perfTimer[ii].net_total);
+        fprintf(file, "      AverageRate: %f\n", (perfTimer[ii].net_total) / totalTime);
       }
+      fprintf(file, "    NetDevice All Ranks\n");
+      fprintf(file, "      TransferCount: %llu\n", perfTimer[ii].net_total_ranks);
+      fprintf(file, "      AverageRate: %f\n",
+            ((double) perfTimer[ii].net_total_ranks) / (perfTimer[ii].average * (double)getNRanks()));
    }
    fprintf(file, "\n");
 }
@@ -345,6 +374,14 @@ void timerStats(void)
 
    for (int ii = 0; ii < numberOfTimers; ii++)
       perfTimer[ii].average = recvBuf[ii] / (double)getNRanks();
+      
+   // Determine total transfer across all ranks
+   for (int ii = 0; ii < numberOfTimers; ii++)
+      sendBuf[ii] = (double)perfTimer[ii].net_total;
+   addDoubleParallel(sendBuf, recvBuf, numberOfTimers);
+   
+   for (int ii = 0; ii < numberOfTimers; ii++)
+      perfTimer[ii].net_total_ranks = recvBuf[ii];
 
 
    // Determine min and max across ranks and which rank
@@ -378,5 +415,23 @@ void timerStats(void)
    {
       perfTimer[ii].stdev = sqrt(recvBuf[ii] / (double) getNRanks());
    }
+}
+
+// aggregate netstats
+static void aggregateNetStats(void)
+{
+  for (int ii = 0; ii < numberOfTimers; ii++) {
+    if (perfTimer[ii].count > 0)
+    {
+       perfTimer[ii].net_rx_total = 0;
+       perfTimer[ii].net_tx_total = 0;
+       perfTimer[ii].net_total = 0;
+       for (int jj = 0; jj < num_devices; ++jj) {
+           perfTimer[ii].net_rx_total += perfTimer[ii].net_rx_bytes[jj];
+           perfTimer[ii].net_tx_total += perfTimer[ii].net_tx_bytes[jj];
+           perfTimer[ii].net_total = perfTimer[ii].net_total + perfTimer[ii].net_rx_bytes[jj] + perfTimer[ii].net_tx_bytes[jj];
+       }
+    }
+  }
 }
 
