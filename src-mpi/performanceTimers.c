@@ -58,6 +58,9 @@ char* timerName[numberOfTimers] = {
    "  redistribute",
    "    atomHalo",
    "  force",
+   "   force 1",
+   "   force 2",
+   "   force 3",
    "    eamHalo",
    "commHalo",
    "commReduce"
@@ -166,18 +169,25 @@ void printPerformanceResults(int nGlobalAtoms, int printRate)
    if (!printRank())
       return;
 
+   uint64_t time = getTime();
+   uint64_t time_new = getTime();
+
+   while (time == time_new) {time_new = getTime();}
+   
+
    // only print timers with non-zero values.
    double tick = getTick();
    double loopTime = perfTimer[loopTimer].total*tick;
    
    fprintf(screenOut, "\n\nTimings for Rank %d\n", getMyRank());
+   fprintf(screenOut, "Timer resolution %12.4g \n", (time_new-time));
    fprintf(screenOut, "        Timer        # Calls    Avg/Call (s)   Total (s)    %% Loop\n");
    fprintf(screenOut, "___________________________________________________________________\n");
    for (int ii=0; ii<numberOfTimers; ++ii)
    {
       double totalTime = perfTimer[ii].total*tick;
       if (perfTimer[ii].count > 0)
-         fprintf(screenOut, "%-16s%12"PRIu64"     %8.4f      %8.4f    %8.2f\n", 
+         fprintf(screenOut, "%-16s%12"PRIu64"     %12.4g      %8.4f    %8.2f\n", 
                  timerName[ii],
                  perfTimer[ii].count,
                  totalTime/(double)perfTimer[ii].count,
@@ -224,7 +234,7 @@ void printPerformanceResults(int nGlobalAtoms, int printRate)
 /*         }*/
         fprintf(screenOut, "    NetDevice All\n");
         fprintf(screenOut, "      RXCount: %llu\n", perfTimer[ii].net_rx_total);
-        fprintf(screenOut, "      TXCount: %llu\n", perfTimer[ii].net_rx_total);
+        fprintf(screenOut, "      TXCount: %llu\n", perfTimer[ii].net_tx_total);
         fprintf(screenOut, "      TransferCount: %llu\n", perfTimer[ii].net_total);
         fprintf(screenOut, "      AverageRate: %f\n", ((double)perfTimer[ii].net_total) / totalTime);
       }
@@ -321,7 +331,7 @@ void printPerformanceResultsYaml(FILE* file)
 /*        }*/
         fprintf(file, "    NetDevice All\n");
         fprintf(file, "      RXCount: %llu\n", perfTimer[ii].net_rx_total);
-        fprintf(file, "      TXCount: %llu\n", perfTimer[ii].net_rx_total);
+        fprintf(file, "      TXCount: %llu\n", perfTimer[ii].net_tx_total);
         fprintf(file, "      TransferCount: %llu\n", perfTimer[ii].net_total);
         fprintf(file, "      AverageRate: %f\n", (perfTimer[ii].net_total) / totalTime);
       }

@@ -91,6 +91,8 @@
 #include <string.h>
 #include <math.h>
 #include <assert.h>
+//for std sizes
+#include <stdint.h>
 
 #include "constants.h"
 #include "memUtils.h"
@@ -101,6 +103,9 @@
 #include "haloExchange.h"
 
 #define MAX(A,B) ((A) > (B) ? (A) : (B))
+
+#define PREFETCH_TYPE uint64_t
+PREFETCH_TYPE prefetch_sum = 0;
 
 /// Handles interpolation of tabular data.
 ///
@@ -201,6 +206,109 @@ BasePotential* initEamPot(const char* dir, const char* file, const char* type)
    return (BasePotential*) pot;
 }
 
+
+real_t prefetchPot(InterpolationObject *interp)
+{
+  size_t i;
+  real_t sum = 0.0;
+  
+  // load one pot at a time and cycle through them
+  sum += interp->x0;
+  sum += interp->invDx;
+  for (i = 0; i < interp->n; ++i)
+  {
+    sum += interp->values[i];
+  }
+  
+  return sum;
+} 
+   
+
+void prefetchPots(EamPotential *pot)
+{
+#ifdef DO_PREFETCH_POT
+  if (!prefetch_sum) printf("Friv pot prefetch\n");
+  InterpolationObject *interp;
+   
+  interp = pot->phi;
+  prefetch_sum += prefetchPot(interp);
+  interp = pot->rho;
+  prefetch_sum += prefetchPot(interp);
+  interp = pot->f; 
+  prefetch_sum += prefetchPot(interp);
+#endif
+}
+
+
+PREFETCH_TYPE prefetchBox(int box, SimFlat *s)
+{
+  PREFETCH_TYPE sum = 0.0;
+  int nBox = s->boxes->nAtoms[box];
+  //PREFETCH_TYPE
+  //printf("Prefetch init \n"); fflush(stdout);
+  PREFETCH_TYPE (*r)[3] = (void*)&s->atoms->r[0];
+  PREFETCH_TYPE (*f)[3] = (void*)&s->atoms->f[0];
+  PREFETCH_TYPE (*p)[3] = (void*)&s->atoms->p[0];
+  PREFETCH_TYPE *U = (PREFETCH_TYPE*)s->atoms->U;
+  
+  int stride = 64/(sizeof(PREFETCH_TYPE)*3);
+  //printf("Stride : %d\n",stride);
+
+  // loop over atoms in iBox
+  for (int iOff=MAXATOMS*box,ii=0; ii<nBox; ii+=stride,iOff+=stride)
+  {
+/*    for (int k=0; k<3; k++)*/
+/*    for (int iOff=MAXATOMS*box,ii=0; ii<nBox; ii++,iOff++)*/
+    {
+      sum += r[iOff][0];
+      sum += f[iOff][0];
+      sum += p[iOff][0];
+      //printf("iOff %d\tii %d",iOff,ii);
+      //printf("Loop1 completed\n");fflush(stdout);
+/*      sum += (PREFETCH_TYPE)s->atoms->r[iOff][k];*/
+/*      sum += (PREFETCH_TYPE)s->atoms->f[iOff][k];*/
+/*      sum += (PREFETCH_TYPE)s->atoms->p[iOff][k];*/
+    }
+  }
+  stride = 64 / sizeof(PREFETCH_TYPE);
+  for (int iOff=MAXATOMS*box,ii=0; ii<nBox; ii+=stride,iOff+=stride)
+    sum += U[iOff];
+/*    sum += (PREFETCH_TYPE)s->atoms->U[iOff];*/
+  return sum;
+}
+
+
+void prefetchBoxes(int iBox, int jBox, SimFlat* s)
+{
+#ifdef DO_FRIVOLOUS_PREFETCH  
+	 if (!prefetch_sum) printf("Friv prefetch\n");
+	 prefetch_sum += prefetchBox(jBox, s);
+	 prefetch_sum += prefetchBox(iBox, s);
+#endif // DO_FRIVOLOUS_PREFETCH
+}
+
+#ifdef DO_TWO_PREFETCH
+# define prefetchBoxes(i,j,s) prefetchBoxes(i,j,s);prefetchBoxes(i,j,s);
+#endif
+
+#ifdef SKIP_FORCE_COMPUTATIONS
+# ifdef DO_FRIVOLOUS_TIMING
+#  define frivStartTimer(t) startTimer(t); if (0) {
+#  define frivStopTimer(t) } stopTimer(t)
+# else
+#  define frivStartTimer(t) if (0) {
+#  define frivStopTimer(t) }
+# endif // DO_FRIVOLOUS_TIMING
+#else
+# ifdef DO_FRIVOLOUS_TIMING
+#  define frivStartTimer(t) startTimer(t) 
+#  define frivStopTimer(t) stopTimer(t)
+# else
+#  define frivStartTimer(t)
+#  define frivStopTimer(t)
+# endif // DO_FRIVOLOUS_TIMING
+#endif
+
 /// Calculate potential energy and forces for the EAM potential.
 ///
 /// Three steps are required:
@@ -238,6 +346,9 @@ int eamForce(SimFlat* s)
    memset(pot->dfEmbed, 0, s->boxes->nTotalBoxes*MAXATOMS*sizeof(real_t));
    memset(pot->rhobar,  0, s->boxes->nTotalBoxes*MAXATOMS*sizeof(real_t));
 
+   // prefetch pots
+   prefetchPots(pot);
+   
    int nbrBoxes[27];
    // loop over local boxes
    for (int iBox=0; iBox<s->boxes->nLocalBoxes; iBox++)
@@ -249,7 +360,10 @@ int eamForce(SimFlat* s)
       {
          int jBox = nbrBoxes[jTmp];
          if (jBox < iBox ) continue;
-
+         
+	       prefetchBoxes(iBox, jBox, s);
+	       frivStartTimer(computeForce1Timer);
+	       
          int nJBox = s->boxes->nAtoms[jBox];
          // loop over atoms in iBox
          for (int iOff=MAXATOMS*iBox,ii=0; ii<nIBox; ii++,iOff++)
@@ -264,9 +378,13 @@ int eamForce(SimFlat* s)
                for (int k=0; k<3; k++)
                {
                   dr[k]=s->atoms->r[iOff][k]-s->atoms->r[jOff][k];
+#ifndef SKIP_RCUT
                   r2+=dr[k]*dr[k];
+#endif
                }
+#ifndef SKIP_RCUT
                if(r2>rCut2) continue;
+#endif
 
                double r = sqrt(r2);
 
@@ -297,6 +415,8 @@ int eamForce(SimFlat* s)
 
             } // loop over atoms in jBox
          } // loop over atoms in iBox
+	 frivStopTimer(computeForce1Timer);
+
       } // loop over neighbor boxes
    } // loop over local boxes
 
@@ -308,6 +428,7 @@ int eamForce(SimFlat* s)
       int nIBox =  s->boxes->nAtoms[iBox];
 
       // loop over atoms in iBox
+      frivStartTimer(computeForce2Timer);
       for (int iOff=MAXATOMS*iBox,ii=0; ii<nIBox; ii++,iOff++)
       {
          real_t fEmbed, dfEmbed;
@@ -316,6 +437,7 @@ int eamForce(SimFlat* s)
          etot += fEmbed; 
          s->atoms->U[iOff] += fEmbed;
       }
+      frivStopTimer(computeForce2Timer);
    }
 
    // exchange derivative of the embedding energy with repsect to rhobar
@@ -335,6 +457,9 @@ int eamForce(SimFlat* s)
          int jBox = nbrBoxes[jTmp];
          if(jBox < iBox) continue;
 
+	       prefetchBoxes(iBox, jBox, s);
+	       frivStartTimer(computeForce3Timer);
+
          int nJBox = s->boxes->nAtoms[jBox];
          // loop over atoms in iBox
          for (int iOff=MAXATOMS*iBox,ii=0; ii<nIBox; ii++,iOff++)
@@ -349,9 +474,13 @@ int eamForce(SimFlat* s)
                for (int k=0; k<3; k++)
                {
                   dr[k]=s->atoms->r[iOff][k]-s->atoms->r[jOff][k];
+#ifndef SKIP_RCUT
                   r2+=dr[k]*dr[k];
+#endif
                }
+#ifndef SKIP_RCUT
                if(r2>=rCut2) continue;
+#endif
 
                real_t r = sqrt(r2);
 
@@ -366,6 +495,7 @@ int eamForce(SimFlat* s)
 
             } // loop over atoms in jBox
          } // loop over atoms in iBox
+	 frivStopTimer(computeForce3Timer);
       } // loop over neighbor boxes
    } // loop over local boxes
 

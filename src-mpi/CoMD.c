@@ -204,7 +204,7 @@ SimFlat* initSimulation(Command cmd)
    redistributeAtoms(sim);
    stopTimer(redistributeTimer);
 
-   startTimer(computeForceTimer);
+   startTimer(computeForceTimer); /* moved within computeForce */
    computeForce(sim);
    stopTimer(computeForceTimer);
 

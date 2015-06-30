@@ -16,8 +16,8 @@ DO_MPI = ON
 ### own.  If you need any -L or -l switches to get C standard libraries
 ### (such as -lm for the math library) put them in C_LIB.
 CC = mpicc
-CFLAGS = -std=c99 -D_POSIX_C_SOURCE_199309L
-OPTFLAGS = -g -O5
+CFLAGS = -std=c99 -D_POSIX_C_SOURCE_199309L $(FRIV) #-DSKIP_FORCE_COMPUTATIONS #-DDO_FRIVOLOUS_PREFETCH
+OPTFLAGS = -g -O3
 INCLUDES = 
 C_LIB = -lm
 
