@@ -378,13 +378,9 @@ int eamForce(SimFlat* s)
                for (int k=0; k<3; k++)
                {
                   dr[k]=s->atoms->r[iOff][k]-s->atoms->r[jOff][k];
-#ifndef SKIP_RCUT
                   r2+=dr[k]*dr[k];
-#endif
                }
-#ifndef SKIP_RCUT
                if(r2>rCut2) continue;
-#endif
 
                double r = sqrt(r2);
 
@@ -392,11 +388,35 @@ int eamForce(SimFlat* s)
                interpolate(pot->phi, r, &phiTmp, &dPhi);
                interpolate(pot->rho, r, &rhoTmp, &dRho);
 
+               real3 *restrict atomsI = &s->atoms->f[iOff];
+               real3 *restrict atomsJ = &s->atoms->f[jOff];
+
+#ifdef UNROLL_DIM               
+               real3 drDivR, drDivRNeg;
+               for (int k = 0; k < 3; ++k)
+               {
+                  drDivR = dr[k]/r;
+                  drDivRNeg = dr[k] / (-r);
+               }
+               
+               for (int k = 0; k < 3; ++k)
+               {
+                  atomsI[k] += dPhi*drDivR[k];
+                  atomsJ[k] += dPhi*drDivRNeg[k];
+               }
+#elif defined RESTRICT_PTR
+               for (int k=0; k<3; k++)
+               {
+                  atomsI[k] -= dPhi*dr[k]/r;
+                  atomsJ[k] += dPhi*dr[k]/r;
+               }
+#else
                for (int k=0; k<3; k++)
                {
                   s->atoms->f[iOff][k] -= dPhi*dr[k]/r;
                   s->atoms->f[jOff][k] += dPhi*dr[k]/r;
                }
+#endif
 
                // update energy terms
                // calculate energy contribution based on whether
@@ -474,24 +494,44 @@ int eamForce(SimFlat* s)
                for (int k=0; k<3; k++)
                {
                   dr[k]=s->atoms->r[iOff][k]-s->atoms->r[jOff][k];
-#ifndef SKIP_RCUT
                   r2+=dr[k]*dr[k];
-#endif
                }
-#ifndef SKIP_RCUT
                if(r2>=rCut2) continue;
-#endif
 
                real_t r = sqrt(r2);
 
                real_t rhoTmp, dRho;
                interpolate(pot->rho, r, &rhoTmp, &dRho);
 
+               real3 *restrict atomsI = &s->atoms->f[iOff];
+               real3 *restrict atomsJ = &s->atoms->f[jOff];
+
+#ifdef UNROLL_DIM               
+               real3 drDivR, drDivRNeg;
+               for (int k = 0; k < 3; ++k)
+               {
+                  drDivR = dr[k]/r;
+                  drDivRNeg = dr[k] / (-r);
+               }
+               
+               for (int k = 0; k < 3; ++k)
+               {
+                  atomsI[k] += dPhi*drDivR[k];
+                  atomsJ[k] += dPhi*drDivRNeg[k];
+               }
+#elif defined RESTRICT_PTR
+               for (int k=0; k<3; k++)
+               {
+                  atomsI[k] -= dPhi*dr[k]/r;
+                  atomsJ[k] += dPhi*dr[k]/r;
+               }
+#else
                for (int k=0; k<3; k++)
                {
                   s->atoms->f[iOff][k] -= (pot->dfEmbed[iOff]+pot->dfEmbed[jOff])*dRho*dr[k]/r;
                   s->atoms->f[jOff][k] += (pot->dfEmbed[iOff]+pot->dfEmbed[jOff])*dRho*dr[k]/r;
                }
+#endif
 
             } // loop over atoms in jBox
          } // loop over atoms in iBox
