@@ -32,7 +32,19 @@ Atoms* initAtoms(LinkCell* boxes)
    atoms->p =        (real3*) comdMalloc(maxTotalAtoms*sizeof(real3));
    atoms->f =        (real3*) comdMalloc(maxTotalAtoms*sizeof(real3));
    atoms->U =        (real_t*)comdMalloc(maxTotalAtoms*sizeof(real_t));
-
+#ifdef NEIGHBOR_LIST  
+   printf("Attempt to alloc %d %d\n",sizeof(neighborList), maxTotalAtoms);
+   atoms->neighbors = (neighborList *)comdMalloc(maxTotalAtoms*sizeof(struct neighborListSt));
+   atoms->numNeighbors = (int*)comdMalloc(maxTotalAtoms*sizeof(int));
+   if (atoms->neighbors) {
+     printf("neighbors alloc'd\n");
+     fflush(stdout);
+   } else {
+     printf("neighbors malloc fail\n");
+     fflush(stdout);
+   }
+   max_neighbors = 0;
+#endif
    atoms->nLocal = 0;
    atoms->nGlobal = 0;
 

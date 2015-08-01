@@ -368,6 +368,10 @@ int eamForce(SimFlat* s)
          // loop over atoms in iBox
          for (int iOff=MAXATOMS*iBox,ii=0; ii<nIBox; ii++,iOff++)
          {
+#ifdef NEIGHBOR_LIST
+            // set # of neighbors in neighbor box
+            int numNeighbors = s->atoms->numNeighbors[iOff];
+#endif 
             // loop over atoms in jBox
             for (int jOff=MAXATOMS*jBox,ij=0; ij<nJBox; ij++,jOff++)
             {
@@ -380,43 +384,35 @@ int eamForce(SimFlat* s)
                   dr[k]=s->atoms->r[iOff][k]-s->atoms->r[jOff][k];
                   r2+=dr[k]*dr[k];
                }
-               if(r2>rCut2) continue;
-
+#ifdef NEIGHBOR_LIST
+               if(r2<rCut2) {
+                 // if we're within cutoff add to neighbors
+                 s->atoms->neighbors[iOff].neighborList[numNeighbors] = jOff;
+                 //s->atoms->neighbors[iOff].distance[numNeighbors] = sqrt(r2);
+                 if (jBox < s->boxes->nLocalBoxes)
+                   s->atoms->neighbors[iOff].neighborScale[numNeighbors] = 2;
+                 else
+                   s->atoms->neighbors[iOff].neighborScale[numNeighbors] = 1;
+                 
+                 numNeighbors++;
+               }
+            } // loop over atoms in jBox
+            s->atoms->numNeighbors[iOff] = numNeighbors;
+            if (max_neighbors < numNeighbors)
+              max_neighbors = numNeighbors;
+#else
+               if(r2>=rCut2) continue;
                double r = sqrt(r2);
 
                real_t phiTmp, dPhi, rhoTmp, dRho;
                interpolate(pot->phi, r, &phiTmp, &dPhi);
                interpolate(pot->rho, r, &rhoTmp, &dRho);
 
-               real3 *restrict atomsI = &s->atoms->f[iOff];
-               real3 *restrict atomsJ = &s->atoms->f[jOff];
-
-#ifdef UNROLL_DIM               
-               real3 drDivR, drDivRNeg;
-               for (int k = 0; k < 3; ++k)
-               {
-                  drDivR = dr[k]/r;
-                  drDivRNeg = dr[k] / (-r);
-               }
-               
-               for (int k = 0; k < 3; ++k)
-               {
-                  atomsI[k] += dPhi*drDivR[k];
-                  atomsJ[k] += dPhi*drDivRNeg[k];
-               }
-#elif defined RESTRICT_PTR
-               for (int k=0; k<3; k++)
-               {
-                  atomsI[k] -= dPhi*dr[k]/r;
-                  atomsJ[k] += dPhi*dr[k]/r;
-               }
-#else
                for (int k=0; k<3; k++)
                {
                   s->atoms->f[iOff][k] -= dPhi*dr[k]/r;
                   s->atoms->f[jOff][k] += dPhi*dr[k]/r;
                }
-#endif
 
                // update energy terms
                // calculate energy contribution based on whether
@@ -434,11 +430,71 @@ int eamForce(SimFlat* s)
                pot->rhobar[jOff] += rhoTmp;
 
             } // loop over atoms in jBox
+#endif
          } // loop over atoms in iBox
 	 frivStopTimer(computeForce1Timer);
 
       } // loop over neighbor boxes
    } // loop over local boxes
+   
+#ifdef NEIGHBOR_LIST
+   // loop over neighborLists
+   // loop over local boxes
+   for (int iBox=0; iBox<s->boxes->nLocalBoxes; iBox++)
+   {
+      int nIBox = s->boxes->nAtoms[iBox];
+      // loop over atoms in ibox
+       for (int iOff=MAXATOMS*iBox,ii=0; ii<nIBox; ii++,iOff++)
+       {
+          // temp structures
+          Atoms *restrict atomsI = s->atoms;
+          Atoms *restrict atomsJ = s->atoms;
+          int numNeighbors = atomsI->numNeighbors[iOff];
+
+          for (int i = 0; i < numNeighbors; ++i) {
+             real3 dr;
+             real_t phiTmp, dPhi, rhoTmp, dRho;
+             int jOff = atomsI->neighbors[iOff].neighborList[i];
+             double r2 = 0.0;
+             // get distances
+             for (int k=0; k<3; k++)
+             {
+                dr[k]=atomsI->r[iOff][k]-atomsJ->r[jOff][k];
+                r2+=dr[k]*dr[k];
+             }               
+/*               dr[0] = atomsI->neighbors[iOff].distances[i][0];*/
+/*               dr[1] = atomsI->neighbors[iOff].distances[i][1];*/
+/*               dr[2] = atomsI->neighbors[iOff].distances[i][2];*/
+             
+             double r = sqrt(r2);//atomsI->neighbors[iOff].distance[i];
+             
+             interpolate(pot->phi, r, &phiTmp, &dPhi);
+             interpolate(pot->rho, r, &rhoTmp, &dRho);
+
+             for (int k=0; k<3; k++)
+             {
+                atomsI->f[iOff][k] -= dPhi*dr[k]/r;
+                atomsJ->f[jOff][k] += dPhi*dr[k]/r;
+             }
+
+             // update energy terms
+             // calculate energy contribution based on whether
+             // the neighbor box is local or remote
+             etot += (0.5*atomsI->neighbors[iOff].neighborScale[i])*phiTmp;
+
+             atomsI->U[iOff] += 0.5*phiTmp;
+             atomsJ->U[jOff] += 0.5*phiTmp;
+
+             // accumulate rhobar for each atom
+             pot->rhobar[iOff] += rhoTmp;
+             pot->rhobar[jOff] += rhoTmp;
+          } // loop over neighbors
+          // done with the atoms in this box, reset it's counters
+          //s->atoms->numNeighbors[iOff] = 0;
+       } // loop over atoms in iBox
+	 frivStopTimer(computeForce1Timer);
+   } // loop over local boxes
+#endif
 
    // Compute Embedding Energy
    // loop over all local boxes
@@ -466,6 +522,49 @@ int eamForce(SimFlat* s)
    stopTimer(eamHaloTimer);
 
    // third pass
+#ifdef NEIGHBOR_LIST
+   // loop over local boxes
+   for (int iBox=0; iBox<s->boxes->nLocalBoxes; iBox++)
+   {
+      int nIBox = s->boxes->nAtoms[iBox];
+      // loop over atoms in ibox
+       for (int iOff=MAXATOMS*iBox,ii=0; ii<nIBox; ii++,iOff++)
+       {
+          // loop over neighborLists
+          // temp structures
+          Atoms *restrict atomsI = s->atoms;
+          Atoms *restrict atomsJ = s->atoms;
+          int numNeighbors = atomsI->numNeighbors[iOff];
+
+          // loop over neighbors  
+          for (int i = 0; i < numNeighbors; ++i) {
+             int jOff = atomsI->neighbors[iOff].neighborList[i];
+             real3 dr;
+             double r2 = 0.0;
+             // get distances
+             for (int k=0; k<3; k++)
+             {
+                dr[k]=atomsI->r[iOff][k]-atomsJ->r[jOff][k];
+                r2+=dr[k]*dr[k];
+             }
+             
+             double r = sqrt(r2);//atomsI->neighbors[iOff].distance[i];
+             
+             real_t rhoTmp, dRho;
+             interpolate(pot->rho, r, &rhoTmp, &dRho);
+
+             for (int k=0; k<3; k++)
+             {
+                atomsI->f[iOff][k] -= (pot->dfEmbed[iOff]+pot->dfEmbed[jOff])*dRho*dr[k]/r;
+                atomsJ->f[jOff][k] += (pot->dfEmbed[iOff]+pot->dfEmbed[jOff])*dRho*dr[k]/r;
+             }
+          } // loop over neighbors
+          // done with the atoms in this box, reset it's counters
+          s->atoms->numNeighbors[iOff] = 0;
+       } // loop over atoms in iBox
+	 frivStopTimer(computeForce1Timer);
+   } // loop over local boxes
+#else    
    // loop over local boxes
    for (int iBox=0; iBox<s->boxes->nLocalBoxes; iBox++)
    {
@@ -506,39 +605,18 @@ int eamForce(SimFlat* s)
                real3 *restrict atomsI = &s->atoms->f[iOff];
                real3 *restrict atomsJ = &s->atoms->f[jOff];
 
-#ifdef UNROLL_DIM               
-               real3 drDivR, drDivRNeg;
-               for (int k = 0; k < 3; ++k)
-               {
-                  drDivR = dr[k]/r;
-                  drDivRNeg = dr[k] / (-r);
-               }
-               
-               for (int k = 0; k < 3; ++k)
-               {
-                  atomsI[k] += dPhi*drDivR[k];
-                  atomsJ[k] += dPhi*drDivRNeg[k];
-               }
-#elif defined RESTRICT_PTR
-               for (int k=0; k<3; k++)
-               {
-                  atomsI[k] -= dPhi*dr[k]/r;
-                  atomsJ[k] += dPhi*dr[k]/r;
-               }
-#else
                for (int k=0; k<3; k++)
                {
                   s->atoms->f[iOff][k] -= (pot->dfEmbed[iOff]+pot->dfEmbed[jOff])*dRho*dr[k]/r;
                   s->atoms->f[jOff][k] += (pot->dfEmbed[iOff]+pot->dfEmbed[jOff])*dRho*dr[k]/r;
                }
-#endif
 
             } // loop over atoms in jBox
          } // loop over atoms in iBox
 	 frivStopTimer(computeForce3Timer);
       } // loop over neighbor boxes
    } // loop over local boxes
-
+#endif
    s->ePotential = (real_t) etot;
 
    return 0;

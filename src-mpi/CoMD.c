@@ -129,6 +129,7 @@ int main(int argc, char** argv)
    sumAtoms(sim);
    printThings(sim, iStep, getElapsedTime(timestepTimer));
    timestampBarrier("Ending simulation\n");
+   printf("Max neighbors %d\n", max_neighbors);
 
    // Epilog
    validateResult(validate, sim);
@@ -413,6 +414,9 @@ void printSimulationDataYaml(FILE* file, SimFlat* s)
    
    // Memory footprint diagnostics
    int perAtomSize = 10*sizeof(real_t)+2*sizeof(int);
+#ifdef NEIGHBOR_LIST
+   perAtomSize += sizeof(neighborList) + sizeof(int) + sizeof(neighborList *);
+#endif
    float mbPerAtom = perAtomSize/1024/1024;
    float totalMemLocal = (float)(perAtomSize*s->atoms->nLocal)/1024/1024;
    float totalMemGlobal = (float)(perAtomSize*s->atoms->nGlobal)/1024/1024;

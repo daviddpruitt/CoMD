@@ -8,6 +8,16 @@
 
 struct SimFlatSt;
 struct LinkCellSt;
+#ifdef NEIGHBOR_LIST
+#define MAX_NEIGHBORS 128  
+typedef struct neighborListSt
+{
+   int neighborList[MAX_NEIGHBORS]; //!< list of neighbors
+   unsigned char neighborScale[MAX_NEIGHBORS]; //!< scaling factor for local remote computation
+//   real_t distance[MAX_NEIGHBORS];  //!< distance of neighbor
+//   real3 distances[MAX_NEIGHBORS]; //!< distances in all dimensions
+} neighborList;
+#endif
 
 /// Atom data
 typedef struct AtomsSt
@@ -18,7 +28,11 @@ typedef struct AtomsSt
 
    int* gid;      //!< A globally unique id for each atom
    int* iSpecies; //!< the species index of the atom
-
+ 
+#ifdef NEIGHBOR_LIST  
+   neighborList *neighbors; //!< neighbor information
+   int *numNeighbors;       //!< number of neighbors
+#endif
    real3*  r;     //!< positions
    real3*  p;     //!< momenta of atoms
    real3*  f;     //!< forces 

@@ -214,7 +214,8 @@ void printPerformanceResults(int nGlobalAtoms, int printRate)
    perfGlobal.atomAllRate = perfTimer[timestepTimer].average * tick * 1e6 /
       (nGlobalAtoms * perfTimer[timestepTimer].count * printRate);
    perfGlobal.atomsPerUSec = 1.0 / perfGlobal.atomAllRate;
-   
+
+#ifdef PRINT_NET_STATS   
    fprintf(screenOut, "\nNetwork Results:\n");
    fprintf(screenOut, "Performance Results For Rank %d:\n", getMyRank());
    for (int ii = 0; ii < numberOfTimers; ii++) {
@@ -243,7 +244,7 @@ void printPerformanceResults(int nGlobalAtoms, int printRate)
       fprintf(screenOut, "      AverageRate: %f\n",
             ((double) perfTimer[ii].net_total_ranks) / (perfTimer[ii].average * (double)getNRanks()));
    }
-
+#endif
    fprintf(screenOut, "\n---------------------------------------------------\n");
    fprintf(screenOut, " Average atom update rate:     %6.2f us/atom/task\n", perfGlobal.atomRate);
    fprintf(screenOut, "---------------------------------------------------\n\n");
