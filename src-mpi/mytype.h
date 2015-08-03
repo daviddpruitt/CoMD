@@ -17,6 +17,7 @@ typedef double real_t; //!< define native type for CoMD as double precision
 
 typedef real_t real3[3]; //!< a convenience vector with three real_t 
 
+int max_neighbors;
 static void zeroReal3(real3 a)
 {
    a[0] = 0.0;

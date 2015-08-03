@@ -450,44 +450,49 @@ int eamForce(SimFlat* s)
           Atoms *restrict atomsI = s->atoms;
           Atoms *restrict atomsJ = s->atoms;
           int numNeighbors = atomsI->numNeighbors[iOff];
+          
+          real3 dr[MAX_NEIGHBORS];
+          real_t phiTmp[MAX_NEIGHBORS], dPhi[MAX_NEIGHBORS];
+          real_t rhoTmp[MAX_NEIGHBORS], dRho[MAX_NEIGHBORS];
+          double r[MAX_NEIGHBORS];
 
           for (int i = 0; i < numNeighbors; ++i) {
-             real3 dr;
-             real_t phiTmp, dPhi, rhoTmp, dRho;
              int jOff = atomsI->neighbors[iOff].neighborList[i];
              double r2 = 0.0;
              // get distances
              for (int k=0; k<3; k++)
              {
-                dr[k]=atomsI->r[iOff][k]-atomsJ->r[jOff][k];
-                r2+=dr[k]*dr[k];
+                dr[i][k]=atomsI->r[iOff][k]-atomsJ->r[jOff][k];
+                r2+=dr[i][k]*dr[i][k];
              }               
-/*               dr[0] = atomsI->neighbors[iOff].distances[i][0];*/
-/*               dr[1] = atomsI->neighbors[iOff].distances[i][1];*/
-/*               dr[2] = atomsI->neighbors[iOff].distances[i][2];*/
-             
-             double r = sqrt(r2);//atomsI->neighbors[iOff].distance[i];
-             
-             interpolate(pot->phi, r, &phiTmp, &dPhi);
-             interpolate(pot->rho, r, &rhoTmp, &dRho);
-
+             r[i] = sqrt(r2);//atomsI->neighbors[iOff].distance[i];
+          }
+          
+          for (int i = 0; i < numNeighbors; ++i) {
+             int jOff = atomsI->neighbors[iOff].neighborList[i];
+             interpolate(pot->phi, r[i], &phiTmp[i], &dPhi[i]);
+             interpolate(pot->rho, r[i], &rhoTmp[i], &dRho[i]);
+          }
+          
+          for (int i = 0; i < numNeighbors; ++i) {
+             int jOff = atomsI->neighbors[iOff].neighborList[i];
              for (int k=0; k<3; k++)
              {
-                atomsI->f[iOff][k] -= dPhi*dr[k]/r;
-                atomsJ->f[jOff][k] += dPhi*dr[k]/r;
+                atomsI->f[iOff][k] -= dPhi[i]*dr[i][k]/r[i];
+                atomsJ->f[jOff][k] += dPhi[i]*dr[i][k]/r[i];
              }
 
              // update energy terms
              // calculate energy contribution based on whether
              // the neighbor box is local or remote
-             etot += (0.5*atomsI->neighbors[iOff].neighborScale[i])*phiTmp;
+             etot += (0.5*atomsI->neighbors[iOff].neighborScale[i])*phiTmp[i];
 
-             atomsI->U[iOff] += 0.5*phiTmp;
-             atomsJ->U[jOff] += 0.5*phiTmp;
+             atomsI->U[iOff] += 0.5*phiTmp[i];
+             atomsJ->U[jOff] += 0.5*phiTmp[i];
 
              // accumulate rhobar for each atom
-             pot->rhobar[iOff] += rhoTmp;
-             pot->rhobar[jOff] += rhoTmp;
+             pot->rhobar[iOff] += rhoTmp[i];
+             pot->rhobar[jOff] += rhoTmp[i];
           } // loop over neighbors
           // done with the atoms in this box, reset it's counters
           //s->atoms->numNeighbors[iOff] = 0;
@@ -535,28 +540,32 @@ int eamForce(SimFlat* s)
           Atoms *restrict atomsI = s->atoms;
           Atoms *restrict atomsJ = s->atoms;
           int numNeighbors = atomsI->numNeighbors[iOff];
-
+          double r[MAX_NEIGHBORS];
+          real_t rhoTmp[MAX_NEIGHBORS], dRho[MAX_NEIGHBORS];
+          real3 dr[MAX_NEIGHBORS];
+          
           // loop over neighbors  
           for (int i = 0; i < numNeighbors; ++i) {
              int jOff = atomsI->neighbors[iOff].neighborList[i];
-             real3 dr;
              double r2 = 0.0;
              // get distances
              for (int k=0; k<3; k++)
              {
-                dr[k]=atomsI->r[iOff][k]-atomsJ->r[jOff][k];
-                r2+=dr[k]*dr[k];
+                dr[i][k]=atomsI->r[iOff][k]-atomsJ->r[jOff][k];
+                r2+=dr[i][k]*dr[i][k];
              }
              
-             double r = sqrt(r2);//atomsI->neighbors[iOff].distance[i];
-             
-             real_t rhoTmp, dRho;
-             interpolate(pot->rho, r, &rhoTmp, &dRho);
-
+             r[i] = sqrt(r2);//atomsI->neighbors[iOff].distance[i];
+          }
+          for (int i = 0; i < numNeighbors; ++i) {
+             interpolate(pot->rho, r[i], &rhoTmp[i], &dRho[i]);
+          }
+          for (int i = 0; i < numNeighbors; ++i) {
+             int jOff = atomsI->neighbors[iOff].neighborList[i];
              for (int k=0; k<3; k++)
              {
-                atomsI->f[iOff][k] -= (pot->dfEmbed[iOff]+pot->dfEmbed[jOff])*dRho*dr[k]/r;
-                atomsJ->f[jOff][k] += (pot->dfEmbed[iOff]+pot->dfEmbed[jOff])*dRho*dr[k]/r;
+                atomsI->f[iOff][k] -= (pot->dfEmbed[iOff]+pot->dfEmbed[jOff])*dRho[i]*dr[i][k]/r[i];
+                atomsJ->f[jOff][k] += (pot->dfEmbed[iOff]+pot->dfEmbed[jOff])*dRho[i]*dr[i][k]/r[i];
              }
           } // loop over neighbors
           // done with the atoms in this box, reset it's counters
