@@ -34,5 +34,14 @@ mv ../bin/CoMD-mpi ../bin/CoMD-mpi-prefetch-pot
 make clean; make FRIV="-DDO_PREFETCH_POT"
 mv ../bin/CoMD-mpi ../bin/CoMD-mpi-pot
 
+make clean; make FRIV="-DSKIP_RCUT"
+mv ../bin/CoMD-mpi ../bin/CoMD-mpi-nocut
+
+make clean; make FRIVE="-DUNROLL_DIM"
+mv ../bin/CoMD-mpi ../bin/CoMD-mpi-unroll
+
+make clean; make FRIVE="-RESTRICT_PTR"
+mv ../bin/CoMD-mpi ../bin/CoMD-mpi-restrict
+
 
 

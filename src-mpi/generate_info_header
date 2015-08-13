@@ -4,6 +4,7 @@ comd_variant=${1}
 cc=`which ${2}`
 cflags=${3}
 ldflags=${4}
+optflags=${5}
 errcode="$?"
 if [ ${errcode} != "0" ] ; then
 cc="unknown";
@@ -68,7 +69,7 @@ cat << END_CAT > CoMD_info.h
 
 #define CoMD_COMPILER "'${cc}'"
 #define CoMD_COMPILER_VERSION "'${cc_version}'"
-#define CoMD_CFLAGS "'${cflags}'"
+#define CoMD_CFLAGS "'${cflags}' '${optflags}'"
 #define CoMD_LDFLAGS "'${ldflags}'"
 
 #endif

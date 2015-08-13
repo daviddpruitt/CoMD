@@ -455,27 +455,45 @@ int eamForce(SimFlat* s)
           real_t phiTmp[MAX_NEIGHBORS], dPhi[MAX_NEIGHBORS];
           real_t rhoTmp[MAX_NEIGHBORS], dRho[MAX_NEIGHBORS];
           double r[MAX_NEIGHBORS];
+          double r2[MAX_NEIGHBORS];
 
           for (int i = 0; i < numNeighbors; ++i) {
              int jOff = atomsI->neighbors[iOff].neighborList[i];
-             double r2 = 0.0;
+# ifndef SEP_LOOPS
+             r2[i] = 0.0;
              // get distances
              for (int k=0; k<3; k++)
              {
                 dr[i][k]=atomsI->r[iOff][k]-atomsJ->r[jOff][k];
-                r2+=dr[i][k]*dr[i][k];
-             }               
-             r[i] = sqrt(r2);//atomsI->neighbors[iOff].distance[i];
+                r2[i]+=dr[i][k]*dr[i][k];
+             }
+# endif
+# ifdef SEP_LOOPS
+             // get distances
+             for (int k=0; k<3; k++)
+             {
+                dr[i][k]=atomsI->r[iOff][k]-atomsJ->r[jOff][k];
+             }
+          }
+          for (int i = 0; i < numNeighbors; ++i) {
+             r2[i] = 0.0;
+             for (int k=0; k<3; k++)
+             {
+                r2[i]+=dr[i][k]*dr[i][k];
+             }             
           }
           
           for (int i = 0; i < numNeighbors; ++i) {
              int jOff = atomsI->neighbors[iOff].neighborList[i];
+# endif
+             r[i] = sqrt(r2[i]);//atomsI->neighbors[iOff].distance[i];
              interpolate(pot->phi, r[i], &phiTmp[i], &dPhi[i]);
              interpolate(pot->rho, r[i], &rhoTmp[i], &dRho[i]);
+# ifdef SEP_LOOPS
           }
-          
           for (int i = 0; i < numNeighbors; ++i) {
              int jOff = atomsI->neighbors[iOff].neighborList[i];
+# endif
              for (int k=0; k<3; k++)
              {
                 atomsI->f[iOff][k] -= dPhi[i]*dr[i][k]/r[i];
@@ -543,25 +561,43 @@ int eamForce(SimFlat* s)
           double r[MAX_NEIGHBORS];
           real_t rhoTmp[MAX_NEIGHBORS], dRho[MAX_NEIGHBORS];
           real3 dr[MAX_NEIGHBORS];
+          double r2[MAX_NEIGHBORS];
           
           // loop over neighbors  
           for (int i = 0; i < numNeighbors; ++i) {
              int jOff = atomsI->neighbors[iOff].neighborList[i];
-             double r2 = 0.0;
+# ifndef SEP_LOOPS
+             r2[i] = 0.0;
              // get distances
              for (int k=0; k<3; k++)
              {
                 dr[i][k]=atomsI->r[iOff][k]-atomsJ->r[jOff][k];
-                r2+=dr[i][k]*dr[i][k];
+                r2[i]+=dr[i][k]*dr[i][k];
              }
-             
-             r[i] = sqrt(r2);//atomsI->neighbors[iOff].distance[i];
+# endif
+# ifdef SEP_LOOPS
+             // get distances
+             for (int k=0; k<3; k++)
+             {
+                dr[i][k]=atomsI->r[iOff][k]-atomsJ->r[jOff][k];
+             }
           }
           for (int i = 0; i < numNeighbors; ++i) {
+             r2[i] = 0.0;
+             for (int k=0; k<3; k++)
+             {
+                r2[i]+=dr[i][k]*dr[i][k];
+             }             
+          }
+          for (int i = 0; i < numNeighbors; ++i) {
+# endif
+             r[i] = sqrt(r2[i]);//atomsI->neighbors[iOff].distance[i];
              interpolate(pot->rho, r[i], &rhoTmp[i], &dRho[i]);
+# ifdef SEP_LOOPS
           }
           for (int i = 0; i < numNeighbors; ++i) {
              int jOff = atomsI->neighbors[iOff].neighborList[i];
+# endif
              for (int k=0; k<3; k++)
              {
                 atomsI->f[iOff][k] -= (pot->dfEmbed[iOff]+pot->dfEmbed[jOff])*dRho[i]*dr[i][k]/r[i];

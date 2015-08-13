@@ -180,7 +180,7 @@ void printPerformanceResults(int nGlobalAtoms, int printRate)
    double loopTime = perfTimer[loopTimer].total*tick;
    
    fprintf(screenOut, "\n\nTimings for Rank %d\n", getMyRank());
-   fprintf(screenOut, "Timer resolution %12.4g \n", (time_new-time));
+   fprintf(screenOut, "Timer resolution %"PRIu64" ms \n", (time_new-time));
    fprintf(screenOut, "        Timer        # Calls    Avg/Call (s)   Total (s)    %% Loop\n");
    fprintf(screenOut, "___________________________________________________________________\n");
    for (int ii=0; ii<numberOfTimers; ++ii)
@@ -331,13 +331,13 @@ void printPerformanceResultsYaml(FILE* file)
 /*           fprintf(file, "      AverageTXRate: %f\n", rate);*/
 /*        }*/
         fprintf(file, "    NetDevice All\n");
-        fprintf(file, "      RXCount: %llu\n", perfTimer[ii].net_rx_total);
-        fprintf(file, "      TXCount: %llu\n", perfTimer[ii].net_tx_total);
-        fprintf(file, "      TransferCount: %llu\n", perfTimer[ii].net_total);
+        fprintf(file, "      RXCount: %"PRIu64"\n", perfTimer[ii].net_rx_total);
+        fprintf(file, "      TXCount: %"PRIu64"\n", perfTimer[ii].net_tx_total);
+        fprintf(file, "      TransferCount: %"PRIu64"\n", perfTimer[ii].net_total);
         fprintf(file, "      AverageRate: %f\n", (perfTimer[ii].net_total) / totalTime);
       }
       fprintf(file, "    NetDevice All Ranks\n");
-      fprintf(file, "      TransferCount: %llu\n", perfTimer[ii].net_total_ranks);
+      fprintf(file, "      TransferCount: %"PRIu64"\n", perfTimer[ii].net_total_ranks);
       fprintf(file, "      AverageRate: %f\n",
             ((double) perfTimer[ii].net_total_ranks) / (perfTimer[ii].average * (double)getNRanks()));
    }

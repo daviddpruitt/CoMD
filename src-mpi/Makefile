@@ -15,6 +15,8 @@ DO_MPI = ON
 ### specify paths to include files that the compiler can't find on its
 ### own.  If you need any -L or -l switches to get C standard libraries
 ### (such as -lm for the math library) put them in C_LIB.
+CLANGFLAGS = -fslp-vectorize-aggressive
+ICCFLAGS = -fp-model precise
 CC = mpicc
 CFLAGS = -std=c99 -D_POSIX_C_SOURCE_199309L $(FRIV) #-DSKIP_FORCE_COMPUTATIONS #-DDO_FRIVOLOUS_PREFETCH
 OPTFLAGS = -g -O3
