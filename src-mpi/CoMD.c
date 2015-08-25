@@ -130,6 +130,7 @@ int main(int argc, char** argv)
    printThings(sim, iStep, getElapsedTime(timestepTimer));
    timestampBarrier("Ending simulation\n");
    printf("Max neighbors %d\n", max_neighbors);
+   printf("Number of times table out of range %d\n", out_range);
 
    // Epilog
    validateResult(validate, sim);

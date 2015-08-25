@@ -370,22 +370,27 @@ int eamForce(SimFlat* s)
          {
 #ifdef NEIGHBOR_LIST
             // set # of neighbors in neighbor box
-            int numNeighbors = s->atoms->numNeighbors[iOff];
-#endif 
+            int numNeighbors = s->atoms->numNeighbors[iOff]; 
+            real_t dr[3][MAXATOMS];
+            real_t r2[MAXATOMS] = {0};
+            
+            // compute vector differences
+            for (int k=0; k<3; k++)
+            {
+	            // loop over atoms in jBox
+            	for (int jOff=MAXATOMS*jBox,ij=0; ij<nJBox; ij++,jOff++)
+            	{
+	              dr[k][ij] = s->atoms->r[iOff][k]-s->atoms->r[jOff][k];
+	              r2[ij]+=dr[k][ij]*dr[k][ij];
+              }
+            }
+            
             // loop over atoms in jBox
             for (int jOff=MAXATOMS*jBox,ij=0; ij<nJBox; ij++,jOff++)
             {
                if ( (iBox==jBox) &&(ij <= ii) ) continue;
-
-               double r2 = 0.0;
-               real3 dr;
-               for (int k=0; k<3; k++)
-               {
-                  dr[k]=s->atoms->r[iOff][k]-s->atoms->r[jOff][k];
-                  r2+=dr[k]*dr[k];
-               }
-#ifdef NEIGHBOR_LIST
-               if(r2<rCut2) {
+               
+               if(r2[ij]<rCut2) {
                  // if we're within cutoff add to neighbors
                  s->atoms->neighbors[iOff].neighborList[numNeighbors] = jOff;
                  //s->atoms->neighbors[iOff].distance[numNeighbors] = sqrt(r2);
@@ -401,8 +406,19 @@ int eamForce(SimFlat* s)
             if (max_neighbors < numNeighbors)
               max_neighbors = numNeighbors;
 #else
+            for (int jOff=MAXATOMS*jBox,ij=0; ij<nJBox; ij++,jOff++)
+            {
+               if ( (iBox==jBox) &&(ij <= ii) ) continue;
+
+               double r2 = 0.0;
+               real3 dr;
+               for (int k=0; k<3; k++)
+               {
+                  dr[k]=s->atoms->r[iOff][k]-s->atoms->r[jOff][k];
+                  r2+=dr[k]*dr[k];
+               }
                if(r2>=rCut2) continue;
-               double r = sqrt(r2);
+               real_t r = sqrt(r2);
 
                real_t phiTmp, dPhi, rhoTmp, dRho;
                interpolate(pot->phi, r, &phiTmp, &dPhi);
@@ -454,8 +470,8 @@ int eamForce(SimFlat* s)
           real3 dr[MAX_NEIGHBORS];
           real_t phiTmp[MAX_NEIGHBORS], dPhi[MAX_NEIGHBORS];
           real_t rhoTmp[MAX_NEIGHBORS], dRho[MAX_NEIGHBORS];
-          double r[MAX_NEIGHBORS];
-          double r2[MAX_NEIGHBORS];
+          real_t r[MAX_NEIGHBORS];
+          real_t r2[MAX_NEIGHBORS];
 
           for (int i = 0; i < numNeighbors; ++i) {
              int jOff = atomsI->neighbors[iOff].neighborList[i];
@@ -558,10 +574,10 @@ int eamForce(SimFlat* s)
           Atoms *restrict atomsI = s->atoms;
           Atoms *restrict atomsJ = s->atoms;
           int numNeighbors = atomsI->numNeighbors[iOff];
-          double r[MAX_NEIGHBORS];
+          real_t r[MAX_NEIGHBORS];
           real_t rhoTmp[MAX_NEIGHBORS], dRho[MAX_NEIGHBORS];
           real3 dr[MAX_NEIGHBORS];
-          double r2[MAX_NEIGHBORS];
+          real_t r2[MAX_NEIGHBORS];
           
           // loop over neighbors  
           for (int i = 0; i < numNeighbors; ++i) {
@@ -805,16 +821,19 @@ void destroyInterpolationObject(InterpolationObject** a)
 void interpolate(InterpolationObject* table, real_t r, real_t* f, real_t* df)
 {
    const real_t* tt = table->values; // alias
-   
-   if ( r < table->x0 ) r = table->x0;
 
+#ifdef TABLE_CHECK    
+   if ( r < table->x0 ) r = table->x0;
+#endif
    r = (r-table->x0)*(table->invDx) ;
    int ii = (int)floor(r);
+#ifdef TABLE_CHECK 
    if (ii > table->n)
    {
       ii = table->n;
       r = table->n / table->invDx;
    }
+#endif
    // reset r to fractional distance
    r = r - floor(r);
 

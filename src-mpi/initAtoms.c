@@ -44,6 +44,7 @@ Atoms* initAtoms(LinkCell* boxes)
      fflush(stdout);
    }
    max_neighbors = 0;
+   out_range = 0;   
 #endif
    atoms->nLocal = 0;
    atoms->nGlobal = 0;

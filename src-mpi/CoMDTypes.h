@@ -51,7 +51,7 @@ typedef struct SpeciesDataSt
 /// Used to check energy conservation and atom conservation. 
 typedef struct ValidateSt
 {
-   double eTot0; //<! Initial total energy
+   real_t eTot0; //<! Initial total energy
    int nAtoms0;  //<! Initial global number of atoms
 } Validate;
 
