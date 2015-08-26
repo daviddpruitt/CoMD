@@ -3,7 +3,7 @@
 ///
 /// The Embedded Atom Model (EAM) is a widely used model of atomic
 /// interactions in simple metals.
-/// 
+///
 /// http://en.wikipedia.org/wiki/Embedded_atom_model
 ///
 /// In the EAM, the total potential energy is written as a sum of a pair
@@ -111,7 +111,7 @@ PREFETCH_TYPE prefetch_sum = 0;
 ///
 /// \see initInterpolationObject
 /// \see interpolate
-typedef struct InterpolationObjectSt 
+typedef struct InterpolationObjectSt
 {
    int n;          //!< the number of values in the table
    real_t x0;      //!< the starting ordinate range
@@ -123,14 +123,14 @@ typedef struct InterpolationObjectSt
 /// Uses table lookups for function evaluation.
 /// Polymorphic with BasePotential.
 /// \see BasePotential
-typedef struct EamPotentialSt 
+typedef struct EamPotentialSt
 {
    real_t cutoff;          //!< potential cutoff distance in Angstroms
    real_t mass;            //!< mass of atoms in intenal units
    real_t lat;             //!< lattice spacing (angs) of unit cell
    char latticeType[8];    //!< lattice type, e.g. FCC, BCC, etc.
    char  name[3];	   //!< element name
-   int	 atomicNo;	   //!< atomic number  
+   int	 atomicNo;	   //!< atomic number
    int  (*force)(SimFlat* s); //!< function pointer to force routine
    void (*print)(FILE* file, BasePotential* pot);
    void (*destroy)(BasePotential** pot); //!< destruction of the potential
@@ -147,7 +147,7 @@ typedef struct EamPotentialSt
 // EAM functionality
 static int eamForce(SimFlat* s);
 static void eamPrint(FILE* file, BasePotential* pot);
-static void eamDestroy(BasePotential** pot); 
+static void eamDestroy(BasePotential** pot);
 static void eamBcastPotential(EamPotential* pot);
 
 
@@ -202,7 +202,7 @@ BasePotential* initEamPot(const char* dir, const char* file, const char* type)
          typeNotSupported("initEamPot", type);
    }
    eamBcastPotential(pot);
-   
+
    return (BasePotential*) pot;
 }
 
@@ -211,7 +211,7 @@ real_t prefetchPot(InterpolationObject *interp)
 {
   size_t i;
   real_t sum = 0.0;
-  
+
   // load one pot at a time and cycle through them
   sum += interp->x0;
   sum += interp->invDx;
@@ -219,22 +219,22 @@ real_t prefetchPot(InterpolationObject *interp)
   {
     sum += interp->values[i];
   }
-  
+
   return sum;
-} 
-   
+}
+
 
 void prefetchPots(EamPotential *pot)
 {
 #ifdef DO_PREFETCH_POT
   if (!prefetch_sum) printf("Friv pot prefetch\n");
   InterpolationObject *interp;
-   
+
   interp = pot->phi;
   prefetch_sum += prefetchPot(interp);
   interp = pot->rho;
   prefetch_sum += prefetchPot(interp);
-  interp = pot->f; 
+  interp = pot->f;
   prefetch_sum += prefetchPot(interp);
 #endif
 }
@@ -250,7 +250,7 @@ PREFETCH_TYPE prefetchBox(int box, SimFlat *s)
   PREFETCH_TYPE (*f)[3] = (void*)&s->atoms->f[0];
   PREFETCH_TYPE (*p)[3] = (void*)&s->atoms->p[0];
   PREFETCH_TYPE *U = (PREFETCH_TYPE*)s->atoms->U;
-  
+
   int stride = 64/(sizeof(PREFETCH_TYPE)*3);
   //printf("Stride : %d\n",stride);
 
@@ -280,7 +280,7 @@ PREFETCH_TYPE prefetchBox(int box, SimFlat *s)
 
 void prefetchBoxes(int iBox, int jBox, SimFlat* s)
 {
-#ifdef DO_FRIVOLOUS_PREFETCH  
+#ifdef DO_FRIVOLOUS_PREFETCH
 	 if (!prefetch_sum) printf("Friv prefetch\n");
 	 prefetch_sum += prefetchBox(jBox, s);
 	 prefetch_sum += prefetchBox(iBox, s);
@@ -301,7 +301,7 @@ void prefetchBoxes(int iBox, int jBox, SimFlat* s)
 # endif // DO_FRIVOLOUS_TIMING
 #else
 # ifdef DO_FRIVOLOUS_TIMING
-#  define frivStartTimer(t) startTimer(t) 
+#  define frivStartTimer(t) startTimer(t)
 #  define frivStopTimer(t) stopTimer(t)
 # else
 #  define frivStartTimer(t)
@@ -319,7 +319,7 @@ void prefetchBoxes(int iBox, int jBox, SimFlat* s)
 ///   derivative for each atom
 ///   -# Loop over all atoms and their neighbors, compute the embedding
 ///   energy contribution to the force and add to the two-body force
-/// 
+///
 int eamForce(SimFlat* s)
 {
    EamPotential* pot = (EamPotential*) s->pot;
@@ -336,7 +336,7 @@ int eamForce(SimFlat* s)
       pot->forceExchangeData->dfEmbed = pot->dfEmbed;
       pot->forceExchangeData->boxes = s->boxes;
    }
-   
+
    real_t rCut2 = pot->cutoff*pot->cutoff;
 
    // zero forces / energy / rho /rhoprime
@@ -348,7 +348,7 @@ int eamForce(SimFlat* s)
 
    // prefetch pots
    prefetchPots(pot);
-   
+
    int nbrBoxes[27];
    // loop over local boxes
    for (int iBox=0; iBox<s->boxes->nLocalBoxes; iBox++)
@@ -360,36 +360,49 @@ int eamForce(SimFlat* s)
       {
          int jBox = nbrBoxes[jTmp];
          if (jBox < iBox ) continue;
-         
+
 	       prefetchBoxes(iBox, jBox, s);
 	       frivStartTimer(computeForce1Timer);
-	       
+
          int nJBox = s->boxes->nAtoms[jBox];
          // loop over atoms in iBox
          for (int iOff=MAXATOMS*iBox,ii=0; ii<nIBox; ii++,iOff++)
          {
 #ifdef NEIGHBOR_LIST
             // set # of neighbors in neighbor box
-            int numNeighbors = s->atoms->numNeighbors[iOff]; 
-            real_t dr[3][MAXATOMS];
+            int numNeighbors = s->atoms->numNeighbors[iOff];
+            // real_t dr[3][MAXATOMS];
+            // real_t r2[MAXATOMS] = {0};
+            //
+            // // compute vector differences
+            // for (int k=0; k<3; k++)
+            // {
+	          //   // loop over atoms in jBox
+            // 	for (int jOff=MAXATOMS*jBox,ij=0; ij<nJBox; ij++,jOff++)
+            // 	{
+	          //     dr[k][ij] = s->atoms->r[iOff][k]-s->atoms->r[jOff][k];
+	          //     r2[ij]+=dr[k][ij]*dr[k][ij];
+            //   }
+            // }
+            real_t dr[MAXATOMS][3];
             real_t r2[MAXATOMS] = {0};
-            
-            // compute vector differences
-            for (int k=0; k<3; k++)
-            {
-	            // loop over atoms in jBox
-            	for (int jOff=MAXATOMS*jBox,ij=0; ij<nJBox; ij++,jOff++)
-            	{
+
+            // loop over atoms in jBox
+          	for (int jOff=MAXATOMS*jBox,ij=0; ij<nJBox; ij++,jOff++)
+          	{
+              // compute vector differences
+              for (int k=0; k<3; k++)
+              {
 	              dr[k][ij] = s->atoms->r[iOff][k]-s->atoms->r[jOff][k];
 	              r2[ij]+=dr[k][ij]*dr[k][ij];
               }
             }
-            
+
             // loop over atoms in jBox
             for (int jOff=MAXATOMS*jBox,ij=0; ij<nJBox; ij++,jOff++)
             {
                if ( (iBox==jBox) &&(ij <= ii) ) continue;
-               
+
                if(r2[ij]<rCut2) {
                  // if we're within cutoff add to neighbors
                  s->atoms->neighbors[iOff].neighborList[numNeighbors] = jOff;
@@ -398,7 +411,7 @@ int eamForce(SimFlat* s)
                    s->atoms->neighbors[iOff].neighborScale[numNeighbors] = 2;
                  else
                    s->atoms->neighbors[iOff].neighborScale[numNeighbors] = 1;
-                 
+
                  numNeighbors++;
                }
             } // loop over atoms in jBox
@@ -452,7 +465,7 @@ int eamForce(SimFlat* s)
 
       } // loop over neighbor boxes
    } // loop over local boxes
-   
+
 #ifdef NEIGHBOR_LIST
    // loop over neighborLists
    // loop over local boxes
@@ -466,7 +479,7 @@ int eamForce(SimFlat* s)
           Atoms *restrict atomsI = s->atoms;
           Atoms *restrict atomsJ = s->atoms;
           int numNeighbors = atomsI->numNeighbors[iOff];
-          
+
           real3 dr[MAX_NEIGHBORS];
           real_t phiTmp[MAX_NEIGHBORS], dPhi[MAX_NEIGHBORS];
           real_t rhoTmp[MAX_NEIGHBORS], dRho[MAX_NEIGHBORS];
@@ -496,9 +509,9 @@ int eamForce(SimFlat* s)
              for (int k=0; k<3; k++)
              {
                 r2[i]+=dr[i][k]*dr[i][k];
-             }             
+             }
           }
-          
+
           for (int i = 0; i < numNeighbors; ++i) {
              int jOff = atomsI->neighbors[iOff].neighborList[i];
 # endif
@@ -549,7 +562,7 @@ int eamForce(SimFlat* s)
          real_t fEmbed, dfEmbed;
          interpolate(pot->f, pot->rhobar[iOff], &fEmbed, &dfEmbed);
          pot->dfEmbed[iOff] = dfEmbed; // save derivative for halo exchange
-         etot += fEmbed; 
+         etot += fEmbed;
          s->atoms->U[iOff] += fEmbed;
       }
       frivStopTimer(computeForce2Timer);
@@ -578,8 +591,8 @@ int eamForce(SimFlat* s)
           real_t rhoTmp[MAX_NEIGHBORS], dRho[MAX_NEIGHBORS];
           real3 dr[MAX_NEIGHBORS];
           real_t r2[MAX_NEIGHBORS];
-          
-          // loop over neighbors  
+
+          // loop over neighbors
           for (int i = 0; i < numNeighbors; ++i) {
              int jOff = atomsI->neighbors[iOff].neighborList[i];
 # ifndef SEP_LOOPS
@@ -603,7 +616,7 @@ int eamForce(SimFlat* s)
              for (int k=0; k<3; k++)
              {
                 r2[i]+=dr[i][k]*dr[i][k];
-             }             
+             }
           }
           for (int i = 0; i < numNeighbors; ++i) {
 # endif
@@ -625,7 +638,7 @@ int eamForce(SimFlat* s)
        } // loop over atoms in iBox
 	 frivStopTimer(computeForce1Timer);
    } // loop over local boxes
-#else    
+#else
    // loop over local boxes
    for (int iBox=0; iBox<s->boxes->nLocalBoxes; iBox++)
    {
@@ -646,7 +659,7 @@ int eamForce(SimFlat* s)
          {
             // loop over atoms in jBox
             for (int jOff=MAXATOMS*jBox,ij=0; ij<nJBox; ij++,jOff++)
-            { 
+            {
                if ((iBox==jBox) && (ij <= ii))  continue;
 
                double r2 = 0.0;
@@ -716,8 +729,8 @@ void eamDestroy(BasePotential** pPot)
 void eamBcastPotential(EamPotential* pot)
 {
    assert(pot);
-   
-   struct 
+
+   struct
    {
       real_t cutoff, mass, lat;
       char latticeType[8];
@@ -757,7 +770,7 @@ void eamBcastPotential(EamPotential* pot)
 /// \param [in] n    number of values in the table.
 /// \param [in] x0   minimum ordinate value of the table.
 /// \param [in] dx   spacing of the ordinate values.
-/// \param [in] data abscissa values.  An array of size n. 
+/// \param [in] data abscissa values.  An array of size n.
 InterpolationObject* initInterpolationObject(
    int n, real_t x0, real_t dx, real_t* data)
 {
@@ -768,14 +781,14 @@ InterpolationObject* initInterpolationObject(
    table->values = (real_t*)comdCalloc(1, (n+3)*sizeof(real_t));
    assert(table->values);
 
-   table->values++; 
+   table->values++;
    table->n = n;
    table->invDx = 1.0/dx;
    table->x0 = x0;
 
    for (int ii=0; ii<n; ++ii)
       table->values[ii] = data[ii];
-   
+
    table->values[-1] = table->values[0];
    table->values[n+1] = table->values[n] = table->values[n-1];
 
@@ -822,12 +835,12 @@ void interpolate(InterpolationObject* table, real_t r, real_t* f, real_t* df)
 {
    const real_t* tt = table->values; // alias
 
-#ifdef TABLE_CHECK    
+#ifdef TABLE_CHECK
    if ( r < table->x0 ) r = table->x0;
 #endif
    r = (r-table->x0)*(table->invDx) ;
    int ii = (int)floor(r);
-#ifdef TABLE_CHECK 
+#ifdef TABLE_CHECK
    if (ii > table->n)
    {
       ii = table->n;
@@ -879,7 +892,7 @@ void bcastInterpolationObject(InterpolationObject** table)
       (*table)->values = comdMalloc(sizeof(real_t) * (buf.n+3) );
       (*table)->values++;
    }
-   
+
    int valuesSize = sizeof(real_t) * ((*table)->n+3);
    bcastParallel((*table)->values-1, valuesSize, 0);
 }
@@ -898,7 +911,7 @@ void printTableData(InterpolationObject* table, const char* fileName)
    }
    fclose(potData);
 }
-   
+
 /// Reads potential data from a setfl file and populates
 /// corresponding members and InterpolationObjects in an EamPotential.
 ///
@@ -920,22 +933,22 @@ void printTableData(InterpolationObject* table, const char* fileName)
 /// | bn       | electron density, starting at r=0
 /// |   ...    | (nr values. Multiple values per line allowed.)
 /// | repeat   | Return to b1 for each atom type.
-/// | phi      | phi_ij for (1,1), (2,1), (2,2), (3,1), (3,2), (3,3), (4,1), ..., 
+/// | phi      | phi_ij for (1,1), (2,1), (2,2), (3,1), (3,2), (3,3), (4,1), ...,
 /// | p1       | pair potential between type i and type j, starting at r=0
 /// |   ...    | (nr values. Multiple values per line allowed.)
 /// | repeat   | Return to p1 for each phi_ij
 ///
 /// Where:
-///    -  ntypes        :      number of element types in the potential  
+///    -  ntypes        :      number of element types in the potential
 ///    -  nrho          :      number of points the embedding energy F(rhobar)
-///    -  drho          :      table spacing for rhobar 
+///    -  drho          :      table spacing for rhobar
 ///    -  nr            :      number of points for rho(r) and phi(r)
 ///    -  dr            :      table spacing for r in Angstroms
 ///    -  rcutoff       :      cut-off distance in Angstroms
 ///    -  ielem(i)      :      atomic number for element(i)
 ///    -  amass(i)      :      atomic mass for element(i) in AMU
 ///    -  latConst(i)   :      lattice constant for element(i) in Angstroms
-///    -  latType(i)    :      lattice type for element(i)  
+///    -  latType(i)    :      lattice type for element(i)
 ///
 /// setfl format stores r*phi(r), so we need to converted to the pair
 /// potential phi(r).  In the file, phi(r)*r is in eV*Angstroms.
@@ -951,7 +964,7 @@ void eamReadSetfl(EamPotential* pot, const char* dir, const char* potName)
    FILE* potFile = fopen(tmp, "r");
    if (potFile == NULL)
       fileNotFound("eamReadSetfl", tmp);
-   
+
    // read the first 3 lines (comments)
    fgets(tmp, sizeof(tmp), potFile);
    fgets(tmp, sizeof(tmp), potFile);
@@ -973,7 +986,7 @@ void eamReadSetfl(EamPotential* pot, const char* dir, const char* potName)
    pot->cutoff = cutoff;
 
    // **** THIS CODE IS RESTRICTED TO ONE ELEMENT
-   // Per-atom header 
+   // Per-atom header
    fgets(tmp, sizeof(tmp), potFile);
    int nAtomic;
    double mass, lat;
@@ -983,7 +996,7 @@ void eamReadSetfl(EamPotential* pot, const char* dir, const char* potName)
    pot->lat = lat;
    pot->mass = mass * amuToInternalMass;  // file has mass in AMU.
    strcpy(pot->latticeType, latticeType);
-   
+
    // allocate read buffer
    int bufSize = MAX(nRho, nR);
    real_t* buf = comdMalloc(bufSize * sizeof(real_t));
@@ -1020,11 +1033,11 @@ void eamReadSetfl(EamPotential* pot, const char* dir, const char* potName)
 
 /// Reads potential data from a funcfl file and populates
 /// corresponding members and InterpolationObjects in an EamPotential.
-/// 
+///
 /// funcfl is a file format for tabulated potential functions used by
 /// the original EAM code DYNAMO.  A funcfl file contains an EAM
 /// potential for a single element.
-/// 
+///
 /// The contents of a funcfl file are:
 ///
 /// | Line Num | Description
@@ -1043,7 +1056,7 @@ void eamReadSetfl(EamPotential* pot, const char* dir, const char* potName)
 ///    -  elem          :   atomic number for this element
 ///    -  amass         :   atomic mass for this element in AMU
 ///    -  latConstant   :   lattice constant for this elemnent in Angstroms
-///    -  lattticeType  :   lattice type for this element (e.g. FCC) 
+///    -  lattticeType  :   lattice type for this element (e.g. FCC)
 ///    -  nrho          :   number of values for the embedding function, F(rhobar)
 ///    -  drho          :   table spacing for rhobar
 ///    -  nr            :   number of values for Z(r) and rho(r)
@@ -1052,7 +1065,7 @@ void eamReadSetfl(EamPotential* pot, const char* dir, const char* potName)
 ///
 /// funcfl format stores the "electrostatic interation" Z(r).  This needs to
 /// be converted to the pair potential phi(r).
-/// using the formula 
+/// using the formula
 /// \f[phi = Z(r) * Z(r) / r\f]
 /// NB: phi is not defined for r = 0
 ///
@@ -1122,7 +1135,7 @@ void eamReadFuncfl(EamPotential* pot, const char* dir, const char* potName)
    pot->rho = initInterpolationObject(nR, x0, dR, buf);
 
    comdFree(buf);
-   
+
 /*    printPot(pot->f,   "funcflDataF.txt"); */
 /*    printPot(pot->rho, "funcflDataRho.txt"); */
 /*    printPot(pot->phi, "funcflDataPhi.txt"); */
