@@ -416,8 +416,8 @@ int eamForce(SimFlat* s)
                }
             } // loop over atoms in jBox
             s->atoms->numNeighbors[iOff] = numNeighbors;
-            if (max_neighbors < numNeighbors)
-              max_neighbors = numNeighbors;
+            // if (max_neighbors < numNeighbors)
+            //   max_neighbors = numNeighbors;
 #else
             for (int jOff=MAXATOMS*jBox,ij=0; ij<nJBox; ij++,jOff++)
             {
