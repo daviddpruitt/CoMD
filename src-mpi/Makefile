@@ -18,10 +18,10 @@ DO_MPI = ON
 CLANGFLAGS = -fslp-vectorize-aggressive
 ICCFLAGS = -fp-model precise -qopt-report=5
 CC = mpicc
-CFLAGS = -std=c99 -D_POSIX_C_SOURCE_199309L $(FRIV) #-DSKIP_FORCE_COMPUTATIONS #-DDO_FRIVOLOUS_PREFETCH
-#CFLAGS += $ICCFLAGS
+CFLAGS = -std=c99 -D_POSIX_C_SOURCE_199309L -g $(FRIV) #-DSKIP_FORCE_COMPUTATIONS #-DDO_FRIVOLOUS_PREFETCH
+CFLAGS += $(ICCFLAGS)
 OPTFLAGS = -g -O3
-INCLUDES = 
+INCLUDES =
 C_LIB = -lm
 
 
@@ -39,13 +39,13 @@ OTHER_INCLUDE =
 
 
 #########################################
-### Below here, it is pitch black.  
+### Below here, it is pitch black.
 ### You are likely to be eaten by a grue.
 ##########################################
 
 # clear all suffixes
 .SUFFIXES:
-# list only those that we use 
+# list only those that we use
 .SUFFIXES: .c .o
 
 .PHONY: DEFAULT clean distclean depend
@@ -82,7 +82,7 @@ DEFAULT: ${CoMD_EXE}
 %.o: %.c
 	${CC} ${CFLAGS} -c $< -o $@
 
-${CoMD_EXE}: ${BIN_DIR} CoMD_info.h ${OBJECTS} 
+${CoMD_EXE}: ${BIN_DIR} CoMD_info.h ${OBJECTS}
 	${CC} ${CFLAGS} -o ${CoMD_EXE} ${OBJECTS} ${LDFLAGS}
 
 CoMD_info.h: Makefile
