@@ -371,32 +371,41 @@ int eamForce(SimFlat* s)
 #ifdef NEIGHBOR_LIST
             // set # of neighbors in neighbor box
             int numNeighbors = s->atoms->numNeighbors[iOff];
-            // real_t dr[3][MAXATOMS];
-            // real_t r2[MAXATOMS] = {0};
-            //
-            // // compute vector differences
-            // for (int k=0; k<3; k++)
-            // {
-	          //   // loop over atoms in jBox
-            // 	for (int jOff=MAXATOMS*jBox,ij=0; ij<nJBox; ij++,jOff++)
-            // 	{
-	          //     dr[k][ij] = s->atoms->r[iOff][k]-s->atoms->r[jOff][k];
-	          //     r2[ij]+=dr[k][ij]*dr[k][ij];
-            //   }
-            // }
-            real_t dr[MAXATOMS][3];
-            real_t r2[MAXATOMS] = {0};
+            real_t dr[MAXATOMS];
+            real_t r2[MAXATOMS];// {0};
+	    
 
-            // loop over atoms in jBox
-          	for (int jOff=MAXATOMS*jBox,ij=0; ij<nJBox; ij++,jOff++)
-          	{
-              // compute vector differences
-              for (int k=0; k<3; k++)
+	    // loop over atoms in jBox    
+	    for (int jOff=MAXATOMS*jBox,ij=0; ij<nJBox; ij++,jOff++)
+            {
+	      real_t drx = s->atoms->r[iOff][0]-s->atoms->r[jOff][0];
+	      r2[ij]=drx*drx;
+	    }
+
+            // compute vector differences                     
+            for (int k=1; k<3; k++)
+            {
+              // loop over atoms in jBox    
+              for (int jOff=MAXATOMS*jBox,ij=0; ij<nJBox; ij++,jOff++)
               {
-	              dr[k][ij] = s->atoms->r[iOff][k]-s->atoms->r[jOff][k];
-	              r2[ij]+=dr[k][ij]*dr[k][ij];
+                real_t drx = s->atoms->r[iOff][k]-s->atoms->r[jOff][k];
+                r2[ij]+=drx*drx;
               }
             }
+
+            /* real_t dr[MAXATOMS][3]; */
+            /* real_t r2[MAXATOMS] = {0}; */
+
+            /* // loop over atoms in jBox */
+            /* 	for (int jOff=MAXATOMS*jBox,ij=0; ij<nJBox; ij++,jOff++) */
+            /* 	{ */
+            /*   // compute vector differences */
+            /*   for (int k=0; k<3; k++) */
+            /*   { */
+	    /*           dr[k][ij] = s->atoms->r[iOff][k]-s->atoms->r[jOff][k]; */
+	    /*           r2[ij]+=dr[k][ij]*dr[k][ij]; */
+            /*   } */
+            /* } */
 
             // loop over atoms in jBox
             for (int jOff=MAXATOMS*jBox,ij=0; ij<nJBox; ij++,jOff++)

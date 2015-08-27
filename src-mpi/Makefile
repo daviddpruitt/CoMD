@@ -18,7 +18,7 @@ DO_MPI = ON
 CLANGFLAGS = -fslp-vectorize-aggressive
 ICCFLAGS = -fp-model precise -qopt-report=5
 CC = mpicc
-CFLAGS = -std=c99 -D_POSIX_C_SOURCE_199309L -g $(FRIV) #-DSKIP_FORCE_COMPUTATIONS #-DDO_FRIVOLOUS_PREFETCH
+CFLAGS = -std=c99 -D_POSIX_C_SOURCE_199309L  $(FRIV) #-DSKIP_FORCE_COMPUTATIONS #-DDO_FRIVOLOUS_PREFETCH
 CFLAGS += $(ICCFLAGS)
 OPTFLAGS = -g -O3
 INCLUDES =
@@ -81,6 +81,7 @@ DEFAULT: ${CoMD_EXE}
 
 %.o: %.c
 	${CC} ${CFLAGS} -c $< -o $@
+	${CC} ${CFLAGS} -S $< 
 
 ${CoMD_EXE}: ${BIN_DIR} CoMD_info.h ${OBJECTS}
 	${CC} ${CFLAGS} -o ${CoMD_EXE} ${OBJECTS} ${LDFLAGS}
