@@ -93,7 +93,7 @@ ${BIN_DIR}:
 	@if [ ! -d ${BIN_DIR} ]; then mkdir -p ${BIN_DIR} ; fi
 
 clean:
-	rm -f *.o CoMD_info.h .depend
+	rm -f *.o *.s *.optrpt CoMD_info.h .depend
 
 distclean: clean
 	rm -f ${CoMD_EXE} .depend.bak
