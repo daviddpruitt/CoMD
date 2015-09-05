@@ -12,4 +12,4 @@
 
 module load intel/15.0.2
 
-./stampSub.sh
+./runTimingStamp.sh
