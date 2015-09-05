@@ -1,0 +1,19 @@
+Specify compiler:
+module load intel/15.0.2
+
+Job control commands:
+sbatch <submissionScript>
+scancel <jobNumb>
+squeue -u <username>
+
+List of directories:
+run scripts ./examples
+output 	    ./examples
+source	    ./src-mpi
+
+Github commands:
+checkout:		git clone <gitUrl> <dstDir>
+checkout branch		git pull <origin or getUrl> HEAD:<branch>
+add files to commit	git add <file list>
+commit			git commit -m
+upload			git push <origin or gitUrl> HEAD:<branch>
