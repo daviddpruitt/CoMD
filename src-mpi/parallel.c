@@ -1,5 +1,5 @@
 /// \file
-/// Wrappers for MPI functions.  This should be the only compilation 
+/// Wrappers for MPI functions.  This should be the only compilation
 /// unit in the code that directly calls MPI functions.  To build a pure
 /// serial version of the code with no MPI, do not define DO_MPI.  If
 /// DO_MPI is not defined then all MPI functionality is replaced with
@@ -33,7 +33,7 @@ int getNRanks()
    return nRanks;
 }
 
-int getMyRank()   
+int getMyRank()
 {
    return myRank;
 }
@@ -62,6 +62,8 @@ void timestampBarrier(const char* msg)
 
 void initParallel(int* argc, char*** argv)
 {
+   bytes_sent = 0;
+   bytes_recvd = 0;
 #ifdef DO_MPI
    MPI_Init(argc, argv);
    MPI_Comm_rank(MPI_COMM_WORLD, &myRank);
@@ -101,11 +103,15 @@ int sendReceiveParallel(void* sendBuf, int sendLen, int dest,
                 MPI_COMM_WORLD, &status);
    MPI_Get_count(&status, MPI_BYTE, &bytesReceived);
 
+   bytes_sent += sendLen;
+   bytes_recvd += bytesReceived;
    return bytesReceived;
 #else
    assert(source == dest);
    memcpy(recvBuf, sendBuf, sendLen);
 
+   sent_bytes += sendLen;
+   recvd_bytes += bytesReceived;
    return sendLen;
 #endif
 }
@@ -193,5 +199,3 @@ int builtWithMpi(void)
    return 0;
 #endif
 }
-
-

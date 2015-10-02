@@ -19,7 +19,9 @@ CLANGFLAGS = -fslp-vectorize-aggressive
 ICCFLAGS = -fp-model precise -qopt-report=5
 CC = mpicc
 CFLAGS = -std=c99 -D_POSIX_C_SOURCE_199309L  $(FRIV) #-DSKIP_FORCE_COMPUTATIONS #-DDO_FRIVOLOUS_PREFETCH
-CFLAGS += $(ICCFLAGS)
+PAPIFLAGS = -DRUN_PAPI -lpapi #-I/opt/apps/papi/5.3.0/x86_64/include/ -L/opt/apps/papi/5.3.0/x86_64/lib/
+CFLAGS += $(PAPIFLAGS)
+#CFLAGS += $(ICCFLAGS)
 OPTFLAGS = -g -O3
 INCLUDES =
 C_LIB = -lm
@@ -81,7 +83,7 @@ DEFAULT: ${CoMD_EXE}
 
 %.o: %.c
 	${CC} ${CFLAGS} -c $< -o $@
-	${CC} ${CFLAGS} -S $< 
+	${CC} ${CFLAGS} -S $<
 
 ${CoMD_EXE}: ${BIN_DIR} CoMD_info.h ${OBJECTS}
 	${CC} ${CFLAGS} -o ${CoMD_EXE} ${OBJECTS} ${LDFLAGS}

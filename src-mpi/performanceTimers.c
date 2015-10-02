@@ -41,11 +41,16 @@
 #include "yamlOutput.h"
 #include "read_netstats.h"
 
+#include "papi.h"
+
 static uint64_t getTime(void);
 static double getTick(void);
 static void timerStats(void);
 // aggregate netstats
 static void aggregateNetStats(void);
+
+static uint64_t total_sent_bytes;
+static uint64_t total_recv_bytes;
 
 /// You must add timer name in same order as enum in .h file.
 /// Leading spaces can be specified to show a hierarchy of timers.
@@ -83,7 +88,7 @@ typedef struct TimersSt
    uint64_t net_rx_bytes_start[10]; //!< network bytes rx'd
    uint64_t net_tx_bytes[10]; //!< network bytes tx'd
    uint64_t net_rx_bytes[10]; //!< network bytes rx'd
- 
+
    int minRank;        //!< rank with min value
    int maxRank;        //!< rank with max value
 
@@ -91,19 +96,26 @@ typedef struct TimersSt
    double maxValue;    //!< max over ranks
    double average;     //!< average over ranks
    double stdev;       //!< stdev across ranks
-   
+
 } Timers;
 
 /// Global timing data collected.
 typedef struct TimerGlobalSt
 {
-   double atomRate;       //!< average time (us) per atom per rank 
+   double atomRate;       //!< average time (us) per atom per rank
    double atomAllRate;    //!< average time (us) per atom
    double atomsPerUSec;   //!< average atoms per time (us)
 } TimerGlobal;
 
 static Timers perfTimer[numberOfTimers];
 static TimerGlobal perfGlobal;
+static int papi_error = 0;
+
+#define NUM_EVENTS 3
+static int Events[NUM_EVENTS] = {PAPI_TOT_INS, PAPI_L3_TCM, PAPI_DP_OPS};
+long_long values[NUM_EVENTS];
+long_long all_procs[NUM_EVENTS];
+
 static struct net_event **device_list = NULL;
 extern int num_devices;
 
@@ -111,6 +123,19 @@ void profileStart(const enum TimerHandle handle)
 {
    int ii, retval;
    perfTimer[handle].start = getTime();
+
+#ifdef RUN_PAPI
+   if (handle == totalTimer) {
+     int retval = PAPI_start_counters(Events, NUM_EVENTS);
+     if (retval != PAPI_OK) {
+       printf("Error starting counters %s\n",PAPI_strerror(retval));
+       printf("\n");
+       papi_error = 1;
+     }
+   }
+#endif
+
+#ifdef PRINT_NET_STATS
    if (!netstats_init_complete || !device_list) {
       init(&device_list);
    }
@@ -122,7 +147,8 @@ void profileStart(const enum TimerHandle handle)
          perfTimer[handle].net_tx_bytes_start[ii] = device_list[ii]->tx_bytes;
          perfTimer[handle].net_rx_bytes_start[ii] = device_list[ii]->rx_bytes;
       }
-   }      
+   }
+#endif
 }
 
 void profileStop(const enum TimerHandle handle)
@@ -132,7 +158,15 @@ void profileStop(const enum TimerHandle handle)
    uint64_t delta = getTime() - perfTimer[handle].start;
    perfTimer[handle].total += delta;
    perfTimer[handle].elapsed += delta;
-   
+
+#ifdef RUN_PAPI
+   if (handle == totalTimer) {
+     if (PAPI_accum_counters(values, NUM_EVENTS) != PAPI_OK)
+       papi_error = 1;
+   }
+#endif
+
+#ifdef PRINT_NET_STATS
    retval = read_stats(&device_list);
    if (retval) {
      fprintf(screenOut, "Unable to read netstats\n");
@@ -142,6 +176,7 @@ void profileStop(const enum TimerHandle handle)
         perfTimer[handle].net_tx_bytes[ii] = device_list[ii]->tx_bytes - perfTimer[handle].net_tx_bytes_start[ii];
      }
    }
+#endif
 }
 
 /// \details
@@ -173,12 +208,12 @@ void printPerformanceResults(int nGlobalAtoms, int printRate)
    uint64_t time_new = getTime();
 
    while (time == time_new) {time_new = getTime();}
-   
+
 
    // only print timers with non-zero values.
    double tick = getTick();
    double loopTime = perfTimer[loopTimer].total*tick;
-   
+
    fprintf(screenOut, "\n\nTimings for Rank %d\n", getMyRank());
    fprintf(screenOut, "Timer resolution %"PRIu64" ms \n", (time_new-time));
    fprintf(screenOut, "        Timer        # Calls    Avg/Call (s)   Total (s)    %% Loop\n");
@@ -187,7 +222,7 @@ void printPerformanceResults(int nGlobalAtoms, int printRate)
    {
       double totalTime = perfTimer[ii].total*tick;
       if (perfTimer[ii].count > 0)
-         fprintf(screenOut, "%-16s%12"PRIu64"     %12.4g      %8.4f    %8.2f\n", 
+         fprintf(screenOut, "%-16s%12"PRIu64"     %12.4g      %8.4f    %8.2f\n",
                  timerName[ii],
                  perfTimer[ii].count,
                  totalTime/(double)perfTimer[ii].count,
@@ -202,20 +237,29 @@ void printPerformanceResults(int nGlobalAtoms, int printRate)
    for (int ii = 0; ii < numberOfTimers; ++ii)
    {
       if (perfTimer[ii].count > 0)
-         fprintf(screenOut, "%-16s%6d:%10.4f  %6d:%10.4f  %10.4f  %10.4f\n", 
-            timerName[ii], 
+         fprintf(screenOut, "%-16s%6d:%10.4f  %6d:%10.4f  %10.4f  %10.4f\n",
+            timerName[ii],
             perfTimer[ii].minRank, perfTimer[ii].minValue*tick,
             perfTimer[ii].maxRank, perfTimer[ii].maxValue*tick,
             perfTimer[ii].average*tick, perfTimer[ii].stdev*tick);
    }
-   double atomsPerTask = nGlobalAtoms/(real_t)getNRanks();
-   perfGlobal.atomRate = perfTimer[timestepTimer].average * tick * 1e6 /
-      (atomsPerTask * perfTimer[timestepTimer].count * printRate);
-   perfGlobal.atomAllRate = perfTimer[timestepTimer].average * tick * 1e6 /
-      (nGlobalAtoms * perfTimer[timestepTimer].count * printRate);
-   perfGlobal.atomsPerUSec = 1.0 / perfGlobal.atomAllRate;
 
-#ifdef PRINT_NET_STATS   
+   fprintf(screenOut, "\nNetwork Statistics Across 1 Rank\n");
+   fprintf(screenOut, "%-24s%10d\n","Bytes Sent 1 Rank", bytes_sent);
+   fprintf(screenOut, "%-24s%10d\n","Bytes Received 1 Rank", bytes_recvd);
+
+   fprintf(screenOut, "\nNetwork Statistics Across%d Ranks:\n", getNRanks());
+   fprintf(screenOut, "%-24s%10d\n","Bytes Sent", total_sent_bytes);
+   fprintf(screenOut, "%-24s%10d\n","Bytes Received", total_recv_bytes);
+
+#ifdef RUN_PAPI
+   fprintf(screenOut, "\nPapi statistics\n");
+   fprintf(screenOut, "Papi total instruction count: %llu\n", values[0]);
+   fprintf(screenOut, "Papi total l3 misses: %llu\n", values[1]);
+   fprintf(screenOut, "Papi total dp operations: %llu\n", values[2]);
+#endif
+
+#ifdef PRINT_NET_STATS
    fprintf(screenOut, "\nNetwork Results:\n");
    fprintf(screenOut, "Performance Results For Rank %d:\n", getMyRank());
    for (int ii = 0; ii < numberOfTimers; ii++) {
@@ -245,6 +289,14 @@ void printPerformanceResults(int nGlobalAtoms, int printRate)
             ((double) perfTimer[ii].net_total_ranks) / (perfTimer[ii].average * (double)getNRanks()));
    }
 #endif
+
+   double atomsPerTask = nGlobalAtoms/(real_t)getNRanks();
+   perfGlobal.atomRate = perfTimer[timestepTimer].average * tick * 1e6 /
+      (atomsPerTask * perfTimer[timestepTimer].count * printRate);
+   perfGlobal.atomAllRate = perfTimer[timestepTimer].average * tick * 1e6 /
+      (nGlobalAtoms * perfTimer[timestepTimer].count * printRate);
+   perfGlobal.atomsPerUSec = 1.0 / perfGlobal.atomAllRate;
+
    fprintf(screenOut, "\n---------------------------------------------------\n");
    fprintf(screenOut, " Average atom update rate:     %6.2f us/atom/task\n", perfGlobal.atomRate);
    fprintf(screenOut, "---------------------------------------------------\n\n");
@@ -262,7 +314,7 @@ void printPerformanceResultsYaml(FILE* file)
 {
    // Aggregate net stats
    aggregateNetStats();
-   
+
    if (! printRank())
       return;
 
@@ -279,7 +331,7 @@ void printPerformanceResultsYaml(FILE* file)
       {
          double totalTime = perfTimer[ii].total*tick;
          fprintf(file, "  Timer: %s\n", timerName[ii]);
-         fprintf(file, "    CallCount:  %"PRIu64"\n", perfTimer[ii].count); 
+         fprintf(file, "    CallCount:  %"PRIu64"\n", perfTimer[ii].count);
          fprintf(file, "    AvgPerCall: %8.4f\n", totalTime/(double)perfTimer[ii].count);
          fprintf(file, "    Total:      %8.4f\n", totalTime);
          fprintf(file, "    PercentLoop: %8.2f\n", totalTime/loopTime*100);
@@ -293,7 +345,7 @@ void printPerformanceResultsYaml(FILE* file)
       {
          fprintf(file, "  Timer: %s\n", timerName[ii]);
          fprintf(file, "    MinRank: %d\n", perfTimer[ii].minRank);
-         fprintf(file, "    MinTime: %8.4f\n", perfTimer[ii].minValue*tick);     
+         fprintf(file, "    MinTime: %8.4f\n", perfTimer[ii].minValue*tick);
          fprintf(file, "    MaxRank: %d\n", perfTimer[ii].maxRank);
          fprintf(file, "    MaxTime: %8.4f\n", perfTimer[ii].maxValue*tick);
          fprintf(file, "    AvgTime: %8.4f\n", perfTimer[ii].average*tick);
@@ -311,11 +363,20 @@ void printPerformanceResultsYaml(FILE* file)
    fprintf(file, "  AtomRate:\n");
    fprintf(file, "    AverageRate: %6.2f\n", perfGlobal.atomsPerUSec);
    fprintf(file, "    Units: atoms/us\n");
-   
+
    fprintf(file, "Network Results:\n");
    fprintf(file, "  TotalRanks: %d\n", getNRanks());
    fprintf(file, "  ReportingTransferUnits: bytes\n");
    fprintf(file, "Performance Results For Rank %d:\n", getMyRank());
+
+ #ifdef RUN_PAPI
+    fprintf(screenOut, "\nPapi statistics\n");
+    fprintf(screenOut, "Papi total instruction count: %llu\n", values[0]);
+    fprintf(screenOut, "Papi total l3 misses: %llu\n", values[1]);
+    fprintf(screenOut, "Papi total dp operations: %llu\n", values[2]);
+ #endif
+
+#ifdef PRINT_NET_STATS
    for (int ii = 0; ii < numberOfTimers; ii++) {
       if (perfTimer[ii].count > 0)
       {
@@ -341,6 +402,7 @@ void printPerformanceResultsYaml(FILE* file)
       fprintf(file, "      AverageRate: %f\n",
             ((double) perfTimer[ii].net_total_ranks) / (perfTimer[ii].average * (double)getNRanks()));
    }
+#endif
    fprintf(file, "\n");
 }
 
@@ -360,7 +422,7 @@ static uint64_t getTime(void)
    gettimeofday(&ptime, (struct timezone *)NULL);
    t = ((uint64_t)1000000)*(uint64_t)ptime.tv_sec + (uint64_t)ptime.tv_usec;
 
-   return t; 
+   return t;
 }
 
 /// Returns the factor for converting the integer time reported by
@@ -370,14 +432,14 @@ static uint64_t getTime(void)
 static double getTick(void)
 {
    double seconds_per_cycle = 1.0e-6;
-   return seconds_per_cycle; 
+   return seconds_per_cycle;
 }
 
 /// Collect timer statistics across ranks.
 void timerStats(void)
 {
    double sendBuf[numberOfTimers], recvBuf[numberOfTimers];
-   
+
    // Determine average of each timer across ranks
    for (int ii = 0; ii < numberOfTimers; ii++)
       sendBuf[ii] = (double)perfTimer[ii].total;
@@ -385,15 +447,21 @@ void timerStats(void)
 
    for (int ii = 0; ii < numberOfTimers; ii++)
       perfTimer[ii].average = recvBuf[ii] / (double)getNRanks();
-      
+
    // Determine total transfer across all ranks
    for (int ii = 0; ii < numberOfTimers; ii++)
       sendBuf[ii] = (double)perfTimer[ii].net_total;
    addDoubleParallel(sendBuf, recvBuf, numberOfTimers);
-   
+
    for (int ii = 0; ii < numberOfTimers; ii++)
       perfTimer[ii].net_total_ranks = recvBuf[ii];
 
+   // totalbytes sent/recvd
+   int tmp_recv;
+   addIntParallel(&bytes_sent, &tmp_recv, 1);
+   total_sent_bytes = tmp_recv;
+   addIntParallel(&bytes_recvd, &tmp_recv, 1);
+   total_recv_bytes = tmp_recv;
 
    // Determine min and max across ranks and which rank
    RankReduceData reduceSendBuf[numberOfTimers], reduceRecvBuf[numberOfTimers];
@@ -402,19 +470,19 @@ void timerStats(void)
       reduceSendBuf[ii].val = (double)perfTimer[ii].total;
       reduceSendBuf[ii].rank = getMyRank();
    }
-   minRankDoubleParallel(reduceSendBuf, reduceRecvBuf, numberOfTimers);   
+   minRankDoubleParallel(reduceSendBuf, reduceRecvBuf, numberOfTimers);
    for (int ii = 0; ii < numberOfTimers; ii++)
    {
       perfTimer[ii].minValue = reduceRecvBuf[ii].val;
       perfTimer[ii].minRank = reduceRecvBuf[ii].rank;
    }
-   maxRankDoubleParallel(reduceSendBuf, reduceRecvBuf, numberOfTimers);   
+   maxRankDoubleParallel(reduceSendBuf, reduceRecvBuf, numberOfTimers);
    for (int ii = 0; ii < numberOfTimers; ii++)
    {
       perfTimer[ii].maxValue = reduceRecvBuf[ii].val;
       perfTimer[ii].maxRank = reduceRecvBuf[ii].rank;
    }
-   
+
    // Determine standard deviation
    for (int ii = 0; ii < numberOfTimers; ii++)
    {
@@ -445,4 +513,3 @@ static void aggregateNetStats(void)
     }
   }
 }
-

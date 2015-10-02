@@ -7,20 +7,20 @@
 
 /// Timer handles
 enum TimerHandle{
-   totalTimer, 
-   loopTimer, 
-   timestepTimer, 
-   positionTimer, 
-   velocityTimer,  
-   redistributeTimer, 
-   atomHaloTimer, 
-   computeForceTimer, 
-   computeForce1Timer, 
-   computeForce2Timer, 
-   computeForce3Timer, 
-   eamHaloTimer, 
-   commHaloTimer, 
-   commReduceTimer, 
+   totalTimer,
+   loopTimer,
+   timestepTimer,
+   positionTimer,
+   velocityTimer,
+   redistributeTimer,
+   atomHaloTimer,
+   computeForceTimer,
+   computeForce1Timer,
+   computeForce2Timer,
+   computeForce3Timer,
+   eamHaloTimer,
+   commHaloTimer,
+   commReduceTimer,
    numberOfTimers};
 
 /// Use the startTimer and stopTimer macros for timers in code regions
@@ -29,7 +29,7 @@ enum TimerHandle{
 /// tight loop, consider calling profileStart and profileStop instead.
 ///
 /// Place calls as follows to collect time for code pieces.
-/// Time is collected everytime this portion of code is executed. 
+/// Time is collected everytime this portion of code is executed.
 ///
 ///     ...
 ///     startTimer(computeForceTimer);

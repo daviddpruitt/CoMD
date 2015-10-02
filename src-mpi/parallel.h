@@ -63,4 +63,3 @@ void bcastParallel(void* buf, int len, int root);
 int builtWithMpi(void);
 
 #endif
-
