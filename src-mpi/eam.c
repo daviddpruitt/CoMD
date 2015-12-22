@@ -373,19 +373,19 @@ int eamForce(SimFlat* s)
             int numNeighbors = s->atoms->numNeighbors[iOff];
             real_t dr[MAXATOMS];
             real_t r2[MAXATOMS];// {0};
-	    
 
-	    // loop over atoms in jBox    
+
+	    // loop over atoms in jBox
 	    for (int jOff=MAXATOMS*jBox,ij=0; ij<nJBox; ij++,jOff++)
             {
 	      real_t drx = s->atoms->r[iOff][0]-s->atoms->r[jOff][0];
 	      r2[ij]=drx*drx;
 	    }
 
-            // compute vector differences                     
+            // compute vector differences
             for (int k=1; k<3; k++)
             {
-              // loop over atoms in jBox    
+              // loop over atoms in jBox
               for (int jOff=MAXATOMS*jBox,ij=0; ij<nJBox; ij++,jOff++)
               {
                 real_t drx = s->atoms->r[iOff][k]-s->atoms->r[jOff][k];
@@ -840,22 +840,14 @@ void destroyInterpolationObject(InterpolationObject** a)
 /// \param [in] r Point where function value is needed.
 /// \param [out] f The interpolated value of f(r).
 /// \param [out] df The interpolated value of df(r)/dr.
+__attribute__ ((noinline))
 void interpolate(InterpolationObject* table, real_t r, real_t* f, real_t* df)
 {
    const real_t* tt = table->values; // alias
 
-#ifdef TABLE_CHECK
-   if ( r < table->x0 ) r = table->x0;
-#endif
    r = (r-table->x0)*(table->invDx) ;
    int ii = (int)floor(r);
-#ifdef TABLE_CHECK
-   if (ii > table->n)
-   {
-      ii = table->n;
-      r = table->n / table->invDx;
-   }
-#endif
+
    // reset r to fractional distance
    r = r - floor(r);
 

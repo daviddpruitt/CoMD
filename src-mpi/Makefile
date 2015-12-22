@@ -17,10 +17,12 @@ DO_MPI = ON
 ### (such as -lm for the math library) put them in C_LIB.
 CLANGFLAGS = -fslp-vectorize-aggressive
 ICCFLAGS = -fp-model precise -qopt-report=5
+ARMFLAGS = -mtune=cortex-a15 -mcpu=cortex-a15 -mfpu=vfpv4 -mfloat-abi=hard
 CC = mpicc
 CFLAGS = -std=c99 -D_POSIX_C_SOURCE_199309L  $(FRIV) #-DSKIP_FORCE_COMPUTATIONS #-DDO_FRIVOLOUS_PREFETCH
 PAPIFLAGS = -DRUN_PAPI -lpapi #-I/opt/apps/papi/5.3.0/x86_64/include/ -L/opt/apps/papi/5.3.0/x86_64/lib/
-CFLAGS += $(PAPIFLAGS)
+CFLAGS += -march=ivybridge -mtune=ivybridge
+#CFLAGS += $(PAPIFLAGS)
 #CFLAGS += $(ICCFLAGS)
 OPTFLAGS = -g -O3
 INCLUDES =
