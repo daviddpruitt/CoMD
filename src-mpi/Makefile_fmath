@@ -15,27 +15,10 @@ DO_MPI = ON
 ### specify paths to include files that the compiler can't find on its
 ### own.  If you need any -L or -l switches to get C standard libraries
 ### (such as -lm for the math library) put them in C_LIB.
-CLANGFLAGS = -fslp-vectorize-aggressive
-
-#flags for icc compiler
-ICCFLAGS = -fp-model precise -qopt-report=5
-
-#flags for arm architectures
-ARMFLAGS = -mtune=cortex-a15 -mcpu=cortex-a15 -mfpu=vfpv4 -mfloat-abi=hard
-
-#flags for using papi
-PAPIFLAGS = -DRUN_PAPI -lpapi #-I/opt/apps/papi/5.3.0/x86_64/include/ -L/opt/apps/papi/5.3.0/x86_64/lib/
-
 CC = mpicc
-
-#general flags
-CFLAGS = -std=gnu99 -D_POSIX_C_SOURCE_199309L  -mtune=native -march=native $(FRIV) #-DSKIP_FORCE_COMPUTATIONS #-DDO_FRIVOLOUS_PREFETCH
-
-#adding missing
-#CFLAGS += $(PAPIFLAGS)
-#CFLAGS += $(ICCFLAGS)
-OPTFLAGS = -g -O3
-INCLUDES =
+CFLAGS = -std=c99 -D_POSIX_C_SOURCE_199309L
+OPTFLAGS = -march=native -mtune=native -O3 -g
+INCLUDES = 
 C_LIB = -lm
 
 
@@ -53,13 +36,13 @@ OTHER_INCLUDE =
 
 
 #########################################
-### Below here, it is pitch black.
+### Below here, it is pitch black.  
 ### You are likely to be eaten by a grue.
 ##########################################
 
 # clear all suffixes
 .SUFFIXES:
-# list only those that we use
+# list only those that we use 
 .SUFFIXES: .c .o
 
 .PHONY: DEFAULT clean distclean depend
@@ -95,19 +78,18 @@ DEFAULT: ${CoMD_EXE}
 
 %.o: %.c
 	${CC} ${CFLAGS} -c $< -o $@
-	${CC} ${CFLAGS} -S $<
 
-${CoMD_EXE}: ${BIN_DIR} CoMD_info.h ${OBJECTS}
+${CoMD_EXE}: ${BIN_DIR} CoMD_info.h ${OBJECTS} 
 	${CC} ${CFLAGS} -o ${CoMD_EXE} ${OBJECTS} ${LDFLAGS}
 
 CoMD_info.h: Makefile
-	./generate_info_header ${CoMD_VARIANT} "$(CC)" "$(CFLAGS)" "$(LDFLAGS)"
+	./generate_info_header ${CoMD_VARIANT} "$(CC)" "$(CFLAGS)" "$(LDFLAGS)" "$(OPTFLAGS)"
 
 ${BIN_DIR}:
 	@if [ ! -d ${BIN_DIR} ]; then mkdir -p ${BIN_DIR} ; fi
 
 clean:
-	rm -f *.o *.s *.optrpt CoMD_info.h .depend
+	rm -f *.o CoMD_info.h .depend
 
 distclean: clean
 	rm -f ${CoMD_EXE} .depend.bak

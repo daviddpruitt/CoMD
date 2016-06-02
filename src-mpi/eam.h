@@ -19,5 +19,14 @@ typedef struct ForceExchangeDataSt
    struct LinkCellSt* boxes;
 }ForceExchangeData;
 
+// typedef struct InterpolationObjectSt
+// {
+//    int n;          //!< the number of values in the table
+//    real_t x0;      //!< the starting ordinate range
+//    real_t invDx;   //!< the inverse of the table spacing
+//    real_t* values; //!< the abscissa values
+// } InterpolationObject;
+
+
 struct BasePotentialSt* initEamPot(const char* dir, const char* file, const char* type);
 #endif
