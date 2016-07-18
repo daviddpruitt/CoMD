@@ -253,8 +253,8 @@ void printPerformanceResults(int nGlobalAtoms, int printRate)
    fprintf(screenOut, "%-24s%10d\n","Bytes Received 1 Rank", bytes_recvd);
 
    fprintf(screenOut, "\nNetwork Statistics Across%d Ranks:\n", getNRanks());
-   fprintf(screenOut, "%-24s%10d\n","Bytes Sent", total_sent_bytes);
-   fprintf(screenOut, "%-24s%10d\n","Bytes Received", total_recv_bytes);
+   fprintf(screenOut, "%-24s%10"PRIu64"\n","Bytes Sent", total_sent_bytes);
+   fprintf(screenOut, "%-24s%10"PRIu64"\n","Bytes Received", total_recv_bytes);
 
 #ifdef RUN_PAPI
    fprintf(screenOut, "\nPapi statistics\n");

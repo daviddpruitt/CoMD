@@ -31,13 +31,13 @@ x64FLAGS   = -march=native -mtune=native
 ARCH_FLAGS =
 arch := $(shell uname -p)
 ifeq ($(arch), x86_64)
-	ARCH_FLAGS = x64FLAGS
+	ARCH_FLAGS = $(x64FLAGS)
 endif
 ifeq ($(arch), aarch64)
-	ARCH_FLAGS = ARM64FLAGS
+	ARCH_FLAGS = $(ARM64FLAGS)
 endif
 ifeq ($(arch), armv7l)
-	ARCH_FLAGS = ARM32FLAGS
+	ARCH_FLAGS = $(ARM32FLAGS)
 endif
 
 #flags for using papi
@@ -46,7 +46,7 @@ PAPIFLAGS = -DRUN_PAPI -lpapi #-I/opt/apps/papi/5.3.0/x86_64/include/ -L/opt/app
 CC = mpicc
 
 #general flags
-CFLAGS = -std=gnu99 -D_POSIX_C_SOURCE_199309L $(x64FLAGS) $(FRIV) #-DSKIP_FORCE_COMPUTATIONS #-DDO_FRIVOLOUS_PREFETCH
+CFLAGS = -std=gnu99 -D_POSIX_C_SOURCE_199309L $(ARCH_FLAGS) $(FRIV) #-DSKIP_FORCE_COMPUTATIONS #-DDO_FRIVOLOUS_PREFETCH
 
 #adding missing
 #CFLAGS += $(PAPIFLAGS)
