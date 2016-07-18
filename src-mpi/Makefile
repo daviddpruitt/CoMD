@@ -23,7 +23,7 @@ ICCFLAGS = -fp-model precise -qopt-report=5
 #flags for arm architectures
 ARM32FLAGS = -mtune=cortex-a15 -mcpu=cortex-a15 -mfpu=neon
 ARM64FLAGS = -mtune=cortex-a57 -mcpu=cortex-a57
-x64FLAGS   = -march=native -mtune=native
+x64FLAGS   = -march=native -mtune=native -DX86_ASM
 
 #set appropriate architecture flags
 
