@@ -88,7 +88,8 @@ void interpolateLocalTable(InterpolationObject* table, real_t r, real_t* f, real
 }
 
 // this gcc requires movq, clang moves movsd
-#ifdef __GNUC__
+// only on x64
+#if defined (__GNUC__) && defined (X86_ASM)
 void interpolateAsmLoad(InterpolationObject* table, real_t r, real_t* f, real_t* df)
 {
   const real_t* tt = table->values; // alias
@@ -144,7 +145,7 @@ void interpolateAsmLoad(InterpolationObject* table, real_t r, real_t* f, real_t*
   *df = -0.000114;
   return;
 }
-#else
+#elif defined (X86_ASM)
 void interpolateAsmLoad(InterpolationObject* table, real_t r, real_t* f, real_t* df)
 {
    const real_t* tt = table->values; // alias
@@ -198,5 +199,13 @@ void interpolateAsmLoad(InterpolationObject* table, real_t r, real_t* f, real_t*
    // to load a usable value
    //*f = 0.000033;
    *df = -0.000114;
+}
+#else
+// if not x64 them empty
+void interpolateAsmLoad(InterpolationObject* table, real_t r, real_t* f, real_t* df)
+{
+   *f = 0.000033;
+   *df = -0.000114;
+   return;
 }
 #endif

@@ -15,8 +15,8 @@
 struct net_event **net_devices;
 FILE *net_stats_file;
 
-/* 
- * initialize the interface 
+/*
+ * initialize the interface
  */
 int init(struct net_event ***devices)
 {
@@ -26,7 +26,7 @@ int init(struct net_event ***devices)
   uint64_t unused[16];
   struct net_event **dev_list;
   int i;
-  
+
   // determine number of devices
   num_devices = 0;
 
@@ -35,7 +35,7 @@ int init(struct net_event ***devices)
     fprintf(stderr, "Unable to openfile: %s\n", strerror(errno));
     return errno;
   }
-  
+
   // first two lines are headers
   fgets(buffer, 256, net_stats_file);
   fgets(buffer, 256, net_stats_file);
@@ -46,7 +46,7 @@ int init(struct net_event ***devices)
     if (num_devices > 10)
       break;
   }
-  
+
   fclose(net_stats_file);
 
   net_stats_file = fopen(NET_STATS_FILE, "rt");
@@ -61,12 +61,12 @@ int init(struct net_event ***devices)
 
   // now we can setup devices
   dev_list = (struct net_event**)malloc(sizeof(struct net_event*) * num_devices);
-  
+
   for (i = 0; i < num_devices; ++i) {
     dev_list[i] = (struct net_event*)malloc(sizeof(struct net_event));
     fgets(buffer, 256, net_stats_file);
-    sscanf(buffer,"%[^:]%n %1s %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %[^'\n'] " , 
-           dev_list[i]->device_name, 
+    sscanf(buffer,"%[^:]%n %1s %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %[^'\n'] " ,
+           dev_list[i]->device_name,
            &dev_list[i]->name_length,
            single,
            &dev_list[i]->rx_bytes,
@@ -80,12 +80,12 @@ int init(struct net_event ***devices)
            &dev_list[i]->tx_bytes,
            extra);
   }
-  
-  
+
+
   *devices = dev_list;
   netstats_init_complete = 1;
   return 0;
-}	
+}
 
 /* read net stats straight into a buffer
  * this reads the stats from the file directly
@@ -97,12 +97,12 @@ int read_raw(char buffer[], size_t length)
     buffer = NULL;
     return 1;
   }
-  fscanf(net_stats_file, "%length[^'\0']", buffer);
+  //fscanf(net_stats_file, "%length[^'\0']", buffer);
   return 0;
 };
 
-/* 
- * read the netstats into a set of structs 
+/*
+ * read the netstats into a set of structs
  */
 #ifdef NORMAL
 int read_stats(struct net_event ***devices)
@@ -120,7 +120,7 @@ int read_stats(struct net_event ***devices)
   if(!net_stats_file) {
     return 1;
   }
-  
+
   setvbuf(net_stats_file, stream_buff, _IOLBF, 1536);
 
   // first two lines are headers
@@ -129,8 +129,8 @@ int read_stats(struct net_event ***devices)
 
   for (i = 0; i < num_devices; ++i) {
     fgets(buffer, 256, net_stats_file);
-    sscanf(buffer,"%[^:]%n %1s %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %[^'\n'] " , 
-	   dev_list[i]->device_name, 
+    sscanf(buffer,"%[^:]%n %1s %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %[^'\n'] " ,
+	   dev_list[i]->device_name,
 	   &dev_list[i]->name_length,
 	   single,
 	   &dev_list[i]->rx_bytes,
@@ -184,8 +184,8 @@ int read_stats(struct net_event ***devices)
     clock_gettime(CLOCK_REALTIME, &curr_time);
 
     fgets(buffer, 256, net_stats_file);
-    sscanf(buffer,"%[^:]%n %1s %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %[^'\n'] " , 
-	   dev_list[i]->device_name, 
+    sscanf(buffer,"%[^:]%n %1s %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %"PRIu64" %[^'\n'] " ,
+	   dev_list[i]->device_name,
 	   &dev_list[i]->name_length,
 	   single,
 	   &dev_list[i]->rx_bytes,
@@ -201,9 +201,9 @@ int read_stats(struct net_event ***devices)
 
     // calculate throughput, we use realtime since we can't attribute
     // network stats to a particular thread
-    diff = (((curr_time.tv_sec - dev_list[i]->last_read.tv_sec) * 1000000000) 
+    diff = (((curr_time.tv_sec - dev_list[i]->last_read.tv_sec) * 1000000000)
       + (curr_time.tv_nsec - dev_list[i]->last_read.tv_nsec)) / 1000000;
-    dev_list[i]->rx_throughput = (diff ? ((dev_list[i]->rx_bytes - dev_list[i]->rx_bytes_last) / diff) : 0); 
+    dev_list[i]->rx_throughput = (diff ? ((dev_list[i]->rx_bytes - dev_list[i]->rx_bytes_last) / diff) : 0);
     dev_list[i]->tx_throughput = (diff ? ((dev_list[i]->tx_bytes - dev_list[i]->tx_bytes_last) / diff) : 0);
     dev_list[i]->last_read.tv_sec = curr_time.tv_sec;
     dev_list[i]->last_read.tv_nsec = curr_time.tv_nsec;
@@ -221,7 +221,7 @@ int read_stats(struct net_event ***devices)
  * computes the latency of the read_stats call
  * in microseconds
  */
-int compute_latency(struct net_event ***devices) 
+int compute_latency(struct net_event ***devices)
 {
   size_t num_calls = 100000;
   size_t i;
@@ -236,7 +236,7 @@ int compute_latency(struct net_event ***devices)
   clock_gettime(CLOCK_REALTIME, &end);
 
   diff = (((end.tv_sec - begin.tv_sec) * 1000000000) + (end.tv_nsec - begin.tv_nsec)) / 1000;
-  
+
   return (diff / (num_calls/1000));
 }
 int netstats_init_complete = 0;

@@ -41,7 +41,9 @@
 #include "yamlOutput.h"
 #include "read_netstats.h"
 
+#ifdef RUN_PAPI
 #include "papi.h"
+#endif
 
 static uint64_t getTime(void);
 static double getTick(void);
@@ -111,10 +113,12 @@ static Timers perfTimer[numberOfTimers];
 static TimerGlobal perfGlobal;
 static int papi_error = 0;
 
+#ifdef RUN_PAPI
 #define NUM_EVENTS 3
 static int Events[NUM_EVENTS] = {PAPI_TOT_INS, PAPI_L3_TCM, PAPI_DP_OPS};
 long_long values[NUM_EVENTS];
 long_long all_procs[NUM_EVENTS];
+#endif
 
 static struct net_event **device_list = NULL;
 extern int num_devices;
@@ -249,8 +253,8 @@ void printPerformanceResults(int nGlobalAtoms, int printRate)
    fprintf(screenOut, "%-24s%10d\n","Bytes Received 1 Rank", bytes_recvd);
 
    fprintf(screenOut, "\nNetwork Statistics Across%d Ranks:\n", getNRanks());
-   fprintf(screenOut, "%-24s%10d\n","Bytes Sent", total_sent_bytes);
-   fprintf(screenOut, "%-24s%10d\n","Bytes Received", total_recv_bytes);
+   fprintf(screenOut, "%-24s%10"PRIu64"\n","Bytes Sent", total_sent_bytes);
+   fprintf(screenOut, "%-24s%10"PRIu64"\n","Bytes Received", total_recv_bytes);
 
 #ifdef RUN_PAPI
    fprintf(screenOut, "\nPapi statistics\n");

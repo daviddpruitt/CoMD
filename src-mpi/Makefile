@@ -21,7 +21,24 @@ CLANGFLAGS = -fslp-vectorize-aggressive
 ICCFLAGS = -fp-model precise -qopt-report=5
 
 #flags for arm architectures
-ARMFLAGS = -mtune=cortex-a15 -mcpu=cortex-a15 -mfpu=vfpv4 -mfloat-abi=hard
+ARM32FLAGS = -mtune=cortex-a15 -mcpu=cortex-a15 -mfpu=neon
+ARM64FLAGS = -mtune=cortex-a57 -mcpu=cortex-a57
+x64FLAGS   = -march=native -mtune=native -DX86_ASM
+
+#set appropriate architecture flags
+
+#start blank
+ARCH_FLAGS =
+arch := $(shell uname -p)
+ifeq ($(arch), x86_64)
+	ARCH_FLAGS = $(x64FLAGS)
+endif
+ifeq ($(arch), aarch64)
+	ARCH_FLAGS = $(ARM64FLAGS)
+endif
+ifeq ($(arch), armv7l)
+	ARCH_FLAGS = $(ARM32FLAGS)
+endif
 
 #flags for using papi
 PAPIFLAGS = -DRUN_PAPI -lpapi #-I/opt/apps/papi/5.3.0/x86_64/include/ -L/opt/apps/papi/5.3.0/x86_64/lib/
@@ -29,12 +46,12 @@ PAPIFLAGS = -DRUN_PAPI -lpapi #-I/opt/apps/papi/5.3.0/x86_64/include/ -L/opt/app
 CC = mpicc
 
 #general flags
-CFLAGS = -std=gnu99 -D_POSIX_C_SOURCE_199309L  -mtune=native -march=native $(FRIV) #-DSKIP_FORCE_COMPUTATIONS #-DDO_FRIVOLOUS_PREFETCH
+CFLAGS = -std=gnu99 -D_POSIX_C_SOURCE_199309L $(ARCH_FLAGS) $(FRIV) #-DSKIP_FORCE_COMPUTATIONS #-DDO_FRIVOLOUS_PREFETCH
 
 #adding missing
 #CFLAGS += $(PAPIFLAGS)
 #CFLAGS += $(ICCFLAGS)
-OPTFLAGS = -g -O3
+OPTFLAGS = -O3
 INCLUDES =
 C_LIB = -lm
 
